@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import * as participantService from "../services/participantService";
 
 /* ─────────────── Mock Data ─────────────────────── */
 const mockUser = {
@@ -215,7 +217,44 @@ const EventDetailModal = ({ event, onClose }) => {
         </div>
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <button className="flex-1 py-2.5 text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-xl transition-all">Confirm Attendance</button>
+          {event.status === 'Completed' ? (
+            <button disabled className="flex-1 py-2.5 text-sm font-semibold text-gray-500 bg-gray-100 rounded-xl cursor-not-allowed">
+              Event Completed
+            </button>
+          ) : event.isRegistered ? (
+            <button 
+              onClick={async () => {
+                if (!window.confirm("Are you sure you want to withdraw from this event?")) return;
+                try {
+                  await participantService.withdrawFromEvent(event.id);
+                  alert('Withdrawn successfully! Please refresh to update your dashboard.');
+                  onClose();
+                  window.location.reload();
+                } catch (err) {
+                  alert(err.response?.data?.message || 'Withdrawal failed');
+                }
+              }}
+              className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
+            >
+              Withdraw
+            </button>
+          ) : (
+            <button 
+              onClick={async () => {
+                try {
+                  await participantService.registerForEvent(event.id);
+                  alert('Registered successfully! Please refresh to update your dashboard.');
+                  onClose();
+                  window.location.reload();
+                } catch (err) {
+                  alert(err.response?.data?.message || 'Registration failed');
+                }
+              }}
+              className="flex-1 py-2.5 text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-xl transition-all"
+            >
+              Register Now
+            </button>
+          )}
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">Close</button>
         </div>
       </div>
@@ -226,21 +265,87 @@ const EventDetailModal = ({ event, onClose }) => {
 /* ─────────────── Main Dashboard ─────────────────── */
 const ParticipantDashboard = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
   const [activeSection, setActiveSection] = useState("overview");
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [eventsData, historyData] = await Promise.all([
+          participantService.getAvailableEvents(),
+          participantService.getHistory()
+        ]);
+        setEvents((eventsData || []).map(e => ({
+          id: e._id, name: e.title, type: e.participationType === 'team' ? 'Team' : 'Individual',
+          status: e.status === 'ongoing' ? 'Ongoing' : 'Upcoming',
+          date: e.eventDate ? new Date(e.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
+          venue: 'Campus', category: 'Event',
+          seats: (e.totalSlots || 0) - (e.participants?.length || 0)
+        })));
+        setHistory(historyData || []);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const mockUser = {
+    name: user?.name || 'Participant', avatar: user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'P',
+    course: user?.course || '', semester: '', college: user?.institution || user?.institutionName || '',
+    rollNo: user?.email || '', joinedDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''
+  };
+
+  const mockEvents = events;
+  const mockStats = [
+    { icon: "📅", label: "Events Available", value: String(events.length), trend: "Browse" },
+    { icon: "🔴", label: "History", value: String(history.length), trend: "Past events" },
+    { icon: "✅", label: "Registered", value: String(events.filter(e => e.status === 'Ongoing').length), trend: "Active" },
+    { icon: "🏆", label: "Achievements", value: "0", trend: "Earn more" },
+  ];
+  const mockNotifications = [];
+  const mockActivity = (history || []).slice(0, 5).map((h, i) => ({
+    id: i, action: `Event: ${h.title || h.eventId || 'Event'}`, date: h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '', icon: '📝'
+  }));
+  const mockAchievements = [
+    { id: 1, title: "Explorer", desc: "Join your first event", icon: "🌟", earned: history.length > 0 },
+    { id: 2, title: "Team Player", desc: "Join 3 team events", icon: "🤝", earned: false },
+  ];
 
   const filteredEvents = activeTab === "all"
     ? mockEvents
     : mockEvents.filter(e => e.status.toLowerCase() === activeTab);
 
-  const unreadCount = mockNotifications.filter(n => n.unread).length;
-  const handleLogout = () => navigate("/");
+  const myRegisteredEvents = history.map(h => ({
+    id: h.event?._id,
+    name: h.event?.title,
+    type: h.event?.participationType === 'team' ? 'Team' : 'Individual',
+    status: h.event?.status === 'ongoing' ? 'Ongoing' : h.event?.status === 'completed' ? 'Completed' : 'Upcoming',
+    date: h.event?.eventDate ? new Date(h.event?.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
+    venue: 'Campus', category: 'Registered',
+    seats: 0,
+    isRegistered: true,
+    registrationStatus: h.status
+  }));
+
+  const activeMyEvents = myRegisteredEvents.filter(e => e.status !== 'Completed' && e.registrationStatus !== 'withdrawn');
+  const pastMyEvents = myRegisteredEvents.filter(e => e.status === 'Completed' && e.registrationStatus !== 'withdrawn');
+
+  const unreadCount = 0;
+  const handleLogout = () => { logout(); navigate("/"); };
 
   const sideNav = [
     { id: "overview",      label: "Overview",       icon: "🏠" },
     { id: "events",        label: "My Events",      icon: "📅" },
+    { id: "past",          label: "Past Events",    icon: "⏪" },
     { id: "achievements",  label: "Achievements",   icon: "🏆" },
     { id: "activity",      label: "Activity Log",   icon: "📋" },
   ];
@@ -378,8 +483,8 @@ const ParticipantDashboard = () => {
               ))}
             </div>
 
-            {/* ── Section: Overview / Events ── */}
-            {(activeSection === "overview" || activeSection === "events") && (
+            {/* ── Section: Overview ── */}
+            {activeSection === "overview" && (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
                 {/* Events column */}
@@ -411,7 +516,7 @@ const ParticipantDashboard = () => {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {filteredEvents.map(event => <EventCard key={event.id} event={event} />)}
+                    {filteredEvents.map(event => <EventCard key={event.id} event={event} onView={setSelectedEvent} />)}
                     {filteredEvents.length === 0 && (
                       <div className="col-span-2 text-center py-12 text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
                         No events for this filter.
@@ -463,6 +568,36 @@ const ParticipantDashboard = () => {
                       {mockNotifications.map(n => <NotificationItem key={n.id} notif={n} />)}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Section: My Events ── */}
+            {activeSection === "events" && (
+              <div className="space-y-4">
+                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">My Registered Events</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeMyEvents.map(event => <EventCard key={event.id} event={event} onView={setSelectedEvent} />)}
+                  {activeMyEvents.length === 0 && (
+                    <div className="col-span-full text-center py-12 text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
+                      You haven't registered for any active events yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Section: Past Events ── */}
+            {activeSection === "past" && (
+              <div className="space-y-4">
+                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Past Participation</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pastMyEvents.map(event => <EventCard key={event.id} event={event} onView={setSelectedEvent} />)}
+                  {pastMyEvents.length === 0 && (
+                    <div className="col-span-full text-center py-12 text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
+                      No past event participation found.
+                    </div>
+                  )}
                 </div>
               </div>
             )}

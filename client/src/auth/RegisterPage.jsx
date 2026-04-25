@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { registerParticipant, verifyParticipantOtp, registerCoordinator, verifyCoordinatorOtp } from "../services/authService";
+import { registerParticipant, verifyParticipantOtp } from "../services/authService";
 
 /* ── Input Field helper ─────────────────────────────────────── */
 const InputField = ({ label, type = "text", placeholder, required = true, value, onChange, disabled, children, name }) => (
@@ -403,22 +403,17 @@ const RegisterPage = () => {
 
           {/* Role badge */}
           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold mb-5 ${bgAccent} ${accent}`}>
-            <span>{isCoordinator ? "🎯" : "🎓"}</span>
-            {isCoordinator ? "Coordinator Registration" : "Participant Registration"}
+            <span>🎓</span>
+            Participant Registration
           </div>
 
           <h2 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">Create your account</h2>
           <p className="text-slate-500 mb-6 text-sm">
-            {isCoordinator
-              ? "Register as a Coordinator to create and manage events."
-              : "Register as a Participant to discover and join campus events."}
+            Register as a Participant to discover and join campus events.
           </p>
 
           {/* Form */}
-          {isCoordinator
-            ? <CoordinatorForm onSuccess={() => setSubmitted(true)} />
-            : <ParticipantForm onSuccess={() => setSubmitted(true)} />
-          }
+          <ParticipantForm onSuccess={() => setSubmitted(true)} />
 
           {/* Login hint */}
           <p className="text-center text-xs text-slate-400 mt-6">

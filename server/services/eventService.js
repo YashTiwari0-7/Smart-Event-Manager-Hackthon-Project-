@@ -195,6 +195,15 @@ const getPendingCoordinators = async () => {
         .sort({ createdAt: -1 });
 };
 
+const getApprovedCoordinators = async () => {
+    return User.find({
+        role: ROLES.COORDINATOR,
+        isApproved: true
+    })
+        .select('-password')
+        .sort({ createdAt: -1 });
+};
+
 const approveCoordinator = async (coordinatorId) => {
     assertObjectId(coordinatorId, 'Invalid coordinator id');
 
@@ -401,6 +410,114 @@ const getEventParticipants = async (eventId, coordinatorId, filters = {}) => {
     return registrations;
 };
 
+const getEventParticipantsForAdmin = async (eventId) => {
+    assertObjectId(eventId, 'Invalid event id');
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+        throw new AppError('Event not found', 404);
+    }
+
+    return Registration.find({ event: eventId })
+        .populate('user', 'name email gender role course institution institutionName')
+        .populate('team', 'name members')
+        .sort({ createdAt: -1 });
+};
+
+const createCoordinatorByAdmin = async ({ name, email }) => {
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+    const { sendCoordinatorCredentialsEmail } = require('./emailService');
+
+    if (!name || !email) {
+        throw new AppError('Name and email are required', 400);
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await User.findOne({ email: normalizedEmail }).select('_id');
+
+    if (existingUser) {
+        throw new AppError('A user with this email already exists', 400);
+    }
+
+    const rawPassword = crypto.randomBytes(6).toString('hex');
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+    const coordinator = await User.create({
+        name: name.trim(),
+        email: normalizedEmail,
+        password: passwordHash,
+        role: ROLES.COORDINATOR,
+        isApproved: true
+    });
+
+    try {
+        await sendCoordinatorCredentialsEmail({
+            to: normalizedEmail,
+            name: name.trim(),
+            password: rawPassword
+        });
+    } catch (emailError) {
+        console.error('Failed to send coordinator credentials email:', emailError.message);
+    }
+
+    const { password: _, ...coordinatorData } = coordinator.toObject();
+    return coordinatorData;
+};
+
+const deleteCoordinator = async (coordinatorId) => {
+    assertObjectId(coordinatorId, 'Invalid coordinator id');
+
+    const coordinator = await User.findOne({
+        _id: coordinatorId,
+        role: ROLES.COORDINATOR
+    });
+
+    if (!coordinator) {
+        throw new AppError('Coordinator not found', 404);
+    }
+
+    await Event.updateMany(
+        { coordinators: coordinatorId },
+        { $pull: { coordinators: coordinatorId } }
+    );
+
+    await coordinator.deleteOne();
+};
+
+const getCoordinatorDetails = async (coordinatorId) => {
+    assertObjectId(coordinatorId, 'Invalid coordinator id');
+
+    const coordinator = await User.findOne({
+        _id: coordinatorId,
+        role: ROLES.COORDINATOR
+    }).select('-password');
+
+    if (!coordinator) {
+        throw new AppError('Coordinator not found', 404);
+    }
+
+    const assignedEvents = await Event.find({ coordinators: coordinatorId })
+        .populate('coordinators', 'name email')
+        .sort({ createdAt: -1 });
+
+    return { coordinator, assignedEvents };
+};
+
+const getAdminStats = async () => {
+    const [events, registrations] = await Promise.all([
+        Event.find(),
+        Registration.find({ status: 'registered' })
+    ]);
+
+    const totalEvents = events.length;
+    const upcomingEvents = events.filter(e => e.status === 'open').length;
+    const totalParticipation = registrations.length;
+    const avgParticipation = totalEvents > 0 ? Math.round(totalParticipation / totalEvents) : 0;
+
+    return { totalEvents, upcomingEvents, totalParticipation, avgParticipation };
+};
+
 module.exports = {
     createEvent,
     getAllEvents,
@@ -409,6 +526,7 @@ module.exports = {
     deleteEvent,
     getAllCoordinators,
     getPendingCoordinators,
+    getApprovedCoordinators,
     approveCoordinator,
     assignCoordinatorsToEvent,
     getAssignedEvent,
@@ -416,5 +534,10 @@ module.exports = {
     getAssignedEventById,
     configureAssignedEvent,
     getEventParticipants,
-    validateApprovedCoordinators
+    validateApprovedCoordinators,
+    getEventParticipantsForAdmin,
+    createCoordinatorByAdmin,
+    deleteCoordinator,
+    getCoordinatorDetails,
+    getAdminStats
 };

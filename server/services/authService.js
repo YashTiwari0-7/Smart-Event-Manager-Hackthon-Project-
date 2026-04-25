@@ -97,10 +97,6 @@ const loginUser = async ({ email, password }) => {
         throw new AppError('Invalid email or password', 401);
     }
 
-    if (user.role === ROLES.COORDINATOR && !user.isApproved) {
-        throw new AppError('Coordinator not approved by admin yet', 403);
-    }
-
     return buildAuthResponse(user);
 };
 

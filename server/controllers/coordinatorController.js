@@ -1,19 +1,6 @@
 const eventService = require('../services/eventService');
 const coordinatorService = require('../services/coordinatorService');
-const coordinatorRegistrationService = require('../services/coordinatorRegistrationService');
 const asyncHandler = require('../utils/asyncHandler');
-
-const registerCoordinator = asyncHandler(async (req, res) => {
-    const result = await coordinatorRegistrationService.requestCoordinatorRegistration(req.body);
-
-    res.status(200).json(result);
-});
-
-const verifyCoordinatorOtp = asyncHandler(async (req, res) => {
-    const result = await coordinatorRegistrationService.verifyCoordinatorOtp(req.body);
-
-    res.status(201).json(result);
-});
 
 const getAssignedEvents = asyncHandler(async (req, res) => {
     const events = await eventService.getAssignedEvents(req.user._id);
@@ -21,10 +8,31 @@ const getAssignedEvents = asyncHandler(async (req, res) => {
     res.json(events);
 });
 
+const getAssignedEventById = asyncHandler(async (req, res) => {
+    const event = await eventService.getAssignedEventById(req.params.id, req.user._id);
+
+    res.json(event);
+});
+
 const configureEventSettings = asyncHandler(async (req, res) => {
     const event = await eventService.configureAssignedEvent(req.params.id, req.user._id, req.body);
 
     res.json(event);
+});
+
+const getEventParticipants = asyncHandler(async (req, res) => {
+    const participants = await eventService.getEventParticipants(req.params.id, req.user._id);
+
+    res.json(participants);
+});
+
+const endRegistration = asyncHandler(async (req, res) => {
+    const result = await coordinatorService.endRegistration({
+        eventId: req.params.id,
+        coordinatorId: req.user._id
+    });
+
+    res.json(result);
 });
 
 const startEvent = asyncHandler(async (req, res) => {
@@ -34,6 +42,15 @@ const startEvent = asyncHandler(async (req, res) => {
     });
 
     res.json(result);
+});
+
+const getAttendance = asyncHandler(async (req, res) => {
+    const attendance = await coordinatorService.getAttendance({
+        eventId: req.params.id,
+        coordinatorId: req.user._id
+    });
+
+    res.json(attendance);
 });
 
 const markAttendance = asyncHandler(async (req, res) => {
@@ -76,12 +93,6 @@ const generateCertificates = asyncHandler(async (req, res) => {
     res.status(201).json(certificates);
 });
 
-const getEventParticipants = asyncHandler(async (req, res) => {
-    const participants = await eventService.getEventParticipants(req.params.id, req.user._id);
-
-    res.json(participants);
-});
-
 const exportParticipationList = asyncHandler(async (req, res) => {
     const csv = await coordinatorService.exportParticipationList({
         eventId: req.params.id,
@@ -93,16 +104,24 @@ const exportParticipationList = asyncHandler(async (req, res) => {
     res.send(csv);
 });
 
+const getCoordinatorStats = asyncHandler(async (req, res) => {
+    const stats = await coordinatorService.getCoordinatorStats(req.user._id);
+
+    res.json(stats);
+});
+
 module.exports = {
-    registerCoordinator,
-    verifyCoordinatorOtp,
     getAssignedEvents,
+    getAssignedEventById,
     configureEventSettings,
+    getEventParticipants,
+    endRegistration,
     startEvent,
+    getAttendance,
     markAttendance,
     endEvent,
     saveResult,
     generateCertificates,
-    getEventParticipants,
-    exportParticipationList
+    exportParticipationList,
+    getCoordinatorStats
 };

@@ -1,16 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import * as participantService from "../services/participantService";
 
-const allEvents = [
-  { id: 1,  name: "TechSummit 2025",       type: "Team",       status: "Ongoing",  date: "Apr 28, 2025", venue: "Main Auditorium", category: "Technology", seats: 12, desc: "Annual flagship tech conference." },
-  { id: 2,  name: "AI & ML Workshop",      type: "Individual", status: "Upcoming", date: "May 3, 2025",  venue: "Lab Block B",     category: "Technology", seats: 45, desc: "Hands-on workshop on AI/ML fundamentals." },
-  { id: 3,  name: "Pitch Night",           type: "Team",       status: "Upcoming", date: "May 10, 2025", venue: "Innovation Hub",  category: "Business",   seats: 30, desc: "Present your startup idea to investors." },
-  { id: 4,  name: "Design Masterclass",    type: "Individual", status: "Ongoing",  date: "Apr 26, 2025", venue: "Room 204",        category: "Design",     seats: 8,  desc: "Master Figma and design systems." },
-  { id: 5,  name: "Leadership Bootcamp",   type: "Individual", status: "Upcoming", date: "May 15, 2025", venue: "Seminar Hall",    category: "Education",  seats: 60, desc: "Develop essential leadership skills." },
-  { id: 6,  name: "Hackathon 2025",        type: "Team",       status: "Upcoming", date: "May 20, 2025", venue: "Tech Park",       category: "Technology", seats: 20, desc: "24-hour coding hackathon." },
-  { id: 7,  name: "Data Science Summit",   type: "Individual", status: "Upcoming", date: "Jun 1, 2025",  venue: "Conference Hall", category: "Technology", seats: 80, desc: "Explore data science at scale." },
-  { id: 8,  name: "Marketing Workshop",    type: "Team",       status: "Upcoming", date: "Jun 5, 2025",  venue: "Room 101",        category: "Business",   seats: 35, desc: "Digital marketing strategies for 2025." },
-];
+
 
 const categories = ["All", "Technology", "Business", "Design", "Education"];
 
@@ -38,7 +30,14 @@ const EventCard = ({ event }) => {
         <span className="flex items-center gap-1"><span>{event.type === "Team" ? "👥" : "👤"}</span>{event.type}</span>
         <span className="flex items-center gap-1"><span>🎟️</span>{event.seats} seats left</span>
       </div>
-      <button className="mt-auto w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all">
+      <button onClick={async () => {
+        try {
+          await participantService.registerForEvent(event.id);
+          alert('Registered successfully!');
+        } catch (err) {
+          alert(err.response?.data?.message || 'Registration failed');
+        }
+      }} className="mt-auto w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all">
         Register Now
       </button>
     </div>
@@ -50,6 +49,29 @@ const EventsBrowsePage = () => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
+  const [allEvents, setAllEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const data = await participantService.getAvailableEvents();
+        setAllEvents((data || []).map(e => ({
+          id: e._id, name: e.title, type: e.participationType === 'team' ? 'Team' : 'Individual',
+          status: e.status === 'ongoing' ? 'Ongoing' : 'Upcoming',
+          date: e.eventDate ? new Date(e.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
+          venue: 'Campus', category: 'Event',
+          seats: (e.totalSlots || 0) - (e.participants?.length || 0),
+          desc: e.description || ''
+        })));
+      } catch (err) {
+        console.error('Failed to load events:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
 
   const filtered = allEvents.filter(e => {
     const matchSearch   = e.name.toLowerCase().includes(search.toLowerCase());

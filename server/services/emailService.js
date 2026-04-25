@@ -44,7 +44,31 @@ const sendCoordinatorApprovalRequestEmail = async ({ to, coordinator }) => {
     });
 };
 
+const sendCoordinatorCredentialsEmail = async ({ to, name, password }) => {
+    const transporter = createTransporter();
+
+    await transporter.sendMail({
+        from: process.env.EMAIL_SEND,
+        to,
+        subject: 'Your Coordinator Account Has Been Created',
+        text: [
+            `Hello ${name},`,
+            '',
+            'An administrator has created a coordinator account for you on the Smart Event Manager platform.',
+            '',
+            `Email: ${to}`,
+            `Password: ${password}`,
+            '',
+            'Please login and change your password at your earliest convenience.',
+            '',
+            'Thank you,',
+            'Smart Event Manager Team'
+        ].join('\n')
+    });
+};
+
 module.exports = {
     sendOtpEmail,
-    sendCoordinatorApprovalRequestEmail
+    sendCoordinatorApprovalRequestEmail,
+    sendCoordinatorCredentialsEmail
 };

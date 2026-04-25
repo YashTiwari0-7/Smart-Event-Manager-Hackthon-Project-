@@ -1,7 +1,17 @@
 import api from './api';
 
+export const getCoordinatorStats = async () => {
+    const { data } = await api.get('/coordinator/stats');
+    return data;
+};
+
 export const getAssignedEvents = async () => {
     const { data } = await api.get('/coordinator/events');
+    return data;
+};
+
+export const getAssignedEventById = async (id) => {
+    const { data } = await api.get(`/coordinator/event/${id}`);
     return data;
 };
 
@@ -10,8 +20,23 @@ export const configureEvent = async (id, configData) => {
     return data;
 };
 
+export const getEventParticipants = async (id) => {
+    const { data } = await api.get(`/coordinator/event/${id}/participants`);
+    return data;
+};
+
+export const endRegistration = async (id) => {
+    const { data } = await api.post(`/coordinator/event/${id}/end-registration`);
+    return data;
+};
+
 export const startEvent = async (id) => {
     const { data } = await api.post(`/coordinator/event/${id}/start`);
+    return data;
+};
+
+export const getAttendance = async (id) => {
+    const { data } = await api.get(`/coordinator/event/${id}/attendance`);
     return data;
 };
 
@@ -35,14 +60,9 @@ export const generateCertificates = async (id) => {
     return data;
 };
 
-export const getEventParticipants = async (id) => {
-    const { data } = await api.get(`/coordinator/event/${id}/participants`);
-    return data;
-};
-
 export const exportParticipationList = async (id) => {
-    const { data } = await api.get(`/coordinator/event/${id}/export`, {
+    const response = await api.get(`/coordinator/event/${id}/export`, {
         responseType: 'blob'
     });
-    return data;
+    return response.data;
 };

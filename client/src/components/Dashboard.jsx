@@ -134,20 +134,21 @@ const Dashboard = () => {
       {/* ── KPI Cards ───────────────────────────────── */}
       <KPISection stats={kpiStats} />
 
-      {/* ── Recent Events ───────────────────────────── */}
+      {/* ── Upcoming Events ───────────────────────────── */}
       <section className="dashboard-section">
-        <SectionHeader title="Recent Events" btnLabel="See All Events →" onBtnClick={() => navigate('/admin-events')} />
+        <SectionHeader title="Upcoming Events" btnLabel="See All Events →" onBtnClick={() => navigate('/admin-events')} />
         <div className="events-grid">
-          {events.length === 0 ? (
-            <p style={{ color: '#9ca3af', fontSize: '14px', padding: '20px' }}>No events yet. Create your first event!</p>
+          {events.filter(e => e.status === 'upcoming').length === 0 ? (
+            <p style={{ color: '#9ca3af', fontSize: '14px', padding: '20px' }}>No upcoming events at the moment.</p>
           ) : (
-            events.slice(0, 6).map((event) => (
+            events.filter(e => e.status === 'upcoming').slice(0, 6).map((event) => (
               <EventCard key={event._id} event={{
                 id: event._id,
-                title: event.title,
-                description: event.description,
-                status: event.status,
-                date: event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'TBD',
+                name: event.title,
+                category: event.participationType === 'team' ? 'Team Event' : 'Individual',
+                rating: 0,
+                status: 'Upcoming',
+                date: event.eventDate ? new Date(event.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
                 participants: event.participants?.length || 0,
                 coordinators: event.coordinators?.length || 0
               }} />

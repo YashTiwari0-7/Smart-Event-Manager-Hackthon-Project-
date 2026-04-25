@@ -1,11 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import * as participantService from "../services/participantService";
 
-const mockCertificates = [
-  { id: 1, event: "Code Sprint 2025",       date: "Apr 10, 2025", type: "Winner",        category: "Technology" },
-  { id: 2, event: "Design Hackathon",       date: "Mar 22, 2025", type: "Participation", category: "Design"     },
-  { id: 3, event: "AI Workshop Series",     date: "Mar 5, 2025",  type: "Completion",    category: "Technology" },
-];
+
 
 const typeStyles = {
   Winner:        "bg-gray-900 text-white",
@@ -28,18 +25,47 @@ const CertCard = ({ cert }) => (
       </div>
       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1"><span>📅</span>{cert.date}</p>
     </div>
-    <button className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2">
-      <span>⬇️</span> Download PDF
-    </button>
+    {cert.url ? (
+      <a href={`http://localhost:5000/api${cert.url}`} target="_blank" rel="noreferrer" className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2">
+        <span>⬇️</span> Download PDF
+      </a>
+    ) : (
+      <button className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2">
+        <span>⬇️</span> Download PDF
+      </button>
+    )}
   </div>
 );
 
 const CertificatesPage = () => {
   const navigate = useNavigate();
   const [filter, setFilter] = useState("All");
+  const [certificates, setCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
   const types = ["All", "Winner", "Participation", "Completion"];
 
-  const filtered = filter === "All" ? mockCertificates : mockCertificates.filter(c => c.type === filter);
+  useEffect(() => {
+    const fetchCerts = async () => {
+      try {
+        const certs = await participantService.getMyCertificates();
+        setCertificates((certs || []).map((c) => ({
+          id: c._id, 
+          event: c.event?.title || 'Event',
+          date: c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'N/A',
+          type: c.type === 'achievement' ? 'Winner' : 'Participation',
+          category: c.event?.participationType || 'Event',
+          url: c.url
+        })));
+      } catch (err) {
+        console.error('Failed to load certificates:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCerts();
+  }, []);
+
+  const filtered = filter === "All" ? certificates : certificates.filter(c => c.type === filter);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -68,9 +94,9 @@ const CertificatesPage = () => {
         {/* Summary cards */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Total",    value: mockCertificates.length, icon: "📜" },
-            { label: "Winner",   value: mockCertificates.filter(c => c.type === "Winner").length, icon: "🏆" },
-            { label: "Completion", value: mockCertificates.filter(c => c.type === "Completion").length, icon: "✅" },
+            { label: "Total",    value: certificates.length, icon: "📜" },
+            { label: "Winner",   value: certificates.filter(c => c.type === "Winner").length, icon: "🏆" },
+            { label: "Completion", value: certificates.filter(c => c.type === "Completion").length, icon: "✅" },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
               <span className="text-2xl">{s.icon}</span>

@@ -12,7 +12,9 @@ import {
   Filler,
 } from "chart.js";
 import { Line, Bar } from "react-chartjs-2";
-import { registrationsOverTime, participantsPerEvent } from "../data/mockData";
+// Fallback chart data (will be replaced when analytics API is connected)
+const registrationsOverTime = { labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], data: [0, 0, 0, 0, 0, 0] };
+const participantsPerEvent = { labels: ["Event 1", "Event 2", "Event 3", "Event 4", "Event 5"], data: [0, 0, 0, 0, 0] };
 import "./AnalyticsCharts.css";
 
 ChartJS.register(

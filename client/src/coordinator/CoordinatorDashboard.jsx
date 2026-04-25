@@ -51,8 +51,8 @@ const EventCard = ({ event, navigate }) => {
         <button onClick={() => navigate("/coordinator-management")} className="flex-1 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg transition-colors border border-gray-200">
           Configure
         </button>
-        <button onClick={() => navigate(event.status === "Completed" ? "/coordinator-results" : "/coordinator-operations")} className="flex-1 py-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold text-xs rounded-lg transition-colors">
-          {event.status === "Completed" ? "View Results" : "Manage"}
+        <button onClick={() => navigate(event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold text-xs rounded-lg transition-colors">
+          {event.status === "Completed" ? "View Results" : "View Participants"}
         </button>
       </div>
     </div>

@@ -39,17 +39,10 @@ const LandingNavbar = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            {/* Register Dropdown */}
-            <div className="relative group">
-              <button className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors flex items-center gap-1 py-2">
-                Register
-                <span className="text-[10px] mt-0.5">▼</span>
-              </button>
-              <div className="absolute right-0 mt-0 w-36 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col py-1 overflow-hidden z-50">
-                <Link to="/register/participant" className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary-600">Participants</Link>
-                <Link to="/register/coordinator" className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary-600">Coordinator</Link>
-              </div>
-            </div>
+            {/* Register */}
+            <Link to="/register/participant" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
+              Register
+            </Link>
 
             {/* Login Dropdown */}
             <div className="relative group">
@@ -95,7 +88,6 @@ const LandingNavbar = () => {
           <div className="mt-4 border-t border-slate-100 pt-4">
             <p className="text-xs font-semibold text-slate-400 mb-2 uppercase">Register</p>
             <Link to="/register/participant" onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-slate-600 pl-2 hover:text-primary-600">Participants</Link>
-            <Link to="/register/coordinator" onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-slate-600 pl-2 hover:text-primary-600">Coordinator</Link>
           </div>
 
           <div className="mt-2 border-t border-slate-100 pt-4">

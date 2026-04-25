@@ -1,129 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import * as coordinatorService from "../services/coordinatorService";
+import { useAuth } from "../context/AuthContext";
 
-// --- Mock Data ---
-const mockEvents = [
-  {
-    id: 1,
-    name: "Hackathon 2026: The Future of AI",
-    description: "A 48-hour coding marathon focused on innovative AI solutions.",
-    category: "Technical",
-    type: "Team",
-    status: "Live",
-    startDate: "2026-03-10",
-    endDate: "2026-03-12",
-    regOpenDate: "2026-02-01",
-    regCloseDate: "2026-03-01",
-    slots: 200,
-    filledSlots: 120,
-    teamSizeMin: 2,
-    teamSizeMax: 4,
-    genderRule: "None",
-    isPrimaryOwner: true,
-    coordinators: [{ name: "Sarah Jenkins", role: "Primary" }, { name: "Mike Ross", role: "Co-Coordinator" }],
-    volunteers: [{ name: "Alex Dunn", phone: "555-0101", role: "Tech Support" }]
-  },
-  {
-    id: 2,
-    name: "UI/UX Design Sprint",
-    description: "Intensive workshop on modern interface design principles.",
-    category: "Workshop",
-    type: "Individual",
-    status: "Open",
-    startDate: "2026-04-05",
-    endDate: "2026-04-06",
-    regOpenDate: "2026-03-15",
-    regCloseDate: "2026-04-01",
-    slots: 50,
-    filledSlots: 45,
-    teamSizeMin: null,
-    teamSizeMax: null,
-    genderRule: "None",
-    isPrimaryOwner: false,
-    coordinators: [{ name: "David Chen", role: "Primary" }, { name: "Sarah Jenkins", role: "Co-Coordinator" }],
-    volunteers: []
-  },
-  {
-    id: 3,
-    name: "Cybersecurity Bootcamp",
-    description: "Learn offensive and defensive security techniques.",
-    category: "Technical",
-    type: "Team",
-    status: "Closed",
-    startDate: "2026-02-20",
-    endDate: "2026-02-22",
-    regOpenDate: "2026-01-10",
-    regCloseDate: "2026-02-15",
-    slots: 100,
-    filledSlots: 100,
-    teamSizeMin: 4,
-    teamSizeMax: 5,
-    genderRule: "None",
-    isPrimaryOwner: true,
-    coordinators: [{ name: "Sarah Jenkins", role: "Primary" }],
-    volunteers: [{ name: "Chloe Smith", phone: "555-0202", role: "Logistics" }]
-  },
-  {
-    id: 4,
-    name: "Web3 Developer Summit",
-    description: "Exploring decentralized applications and smart contracts.",
-    category: "Conference",
-    type: "Individual",
-    status: "Completed",
-    startDate: "2026-01-15",
-    endDate: "2026-01-16",
-    regOpenDate: "2025-12-01",
-    regCloseDate: "2026-01-10",
-    slots: 400,
-    filledSlots: 350,
-    teamSizeMin: null,
-    teamSizeMax: null,
-    genderRule: "None",
-    isPrimaryOwner: false,
-    coordinators: [{ name: "Emma Wong", role: "Primary" }, { name: "Sarah Jenkins", role: "Co-Coordinator" }],
-    volunteers: []
-  },
-  {
-    id: 5,
-    name: "Robotics Showcase",
-    description: "Annual exhibition of student-built autonomous robots.",
-    category: "Exhibition",
-    type: "Team",
-    status: "Draft",
-    startDate: "2026-05-20",
-    endDate: "2026-05-21",
-    regOpenDate: "2026-04-01",
-    regCloseDate: "2026-05-10",
-    slots: 50,
-    filledSlots: 0,
-    teamSizeMin: 2,
-    teamSizeMax: 3,
-    genderRule: "None",
-    isPrimaryOwner: true,
-    coordinators: [{ name: "Sarah Jenkins", role: "Primary" }],
-    volunteers: []
-  },
-  {
-    id: 6,
-    name: "Cloud Computing Workshop",
-    description: "Hands-on AWS and Azure deployment strategies.",
-    category: "Workshop",
-    type: "Individual",
-    status: "Open",
-    startDate: "2026-04-15",
-    endDate: "2026-04-15",
-    regOpenDate: "2026-03-20",
-    regCloseDate: "2026-04-10",
-    slots: 150,
-    filledSlots: 80,
-    teamSizeMin: null,
-    teamSizeMax: null,
-    genderRule: "None",
-    isPrimaryOwner: true,
-    coordinators: [{ name: "Sarah Jenkins", role: "Primary" }],
-    volunteers: []
-  }
-];
+const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed' };
 
 const categories = ["Technical", "Workshop", "Conference", "Exhibition", "Cultural", "Sports"];
 const genderRules = ["None", "Only Male", "Only Female", "Mixed"];
@@ -147,17 +27,44 @@ const Badge = ({ status }) => {
 // --- Main Page Component ---
 const CoordinatorEventManagement = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  
-  // Panel State
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeEvent, setActiveEvent] = useState(null);
   const [formData, setFormData] = useState(null);
   const [errors, setErrors] = useState({});
+  const [eventsList, setEventsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Filters
-  const filteredEvents = mockEvents.filter(event => {
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const data = await coordinatorService.getAssignedEvents();
+        setEventsList((data || []).map(e => ({
+          id: e._id, name: e.title, description: e.description || '',
+          category: 'Technical', type: e.participationType === 'team' ? 'Team' : 'Individual',
+          status: statusDisplayMap[e.status] || 'Draft',
+          startDate: e.registrationStartDate || '', endDate: e.eventDate || '',
+          regOpenDate: e.registrationStartDate || '', regCloseDate: e.registrationEndDate || '',
+          slots: e.totalSlots || 0, filledSlots: e.participants?.length || 0,
+          teamSizeMin: e.maxTeamSize ? 2 : null, teamSizeMax: e.maxTeamSize || null,
+          genderRule: e.genderSpecification?.enabled ? e.genderSpecification.type : 'None',
+          isPrimaryOwner: !e.configOwner || String(e.configOwner?._id || e.configOwner) === String(user?._id || user?.id),
+          coordinators: (e.coordinators || []).map(c => ({ name: c.name || c, role: 'Coordinator' })),
+          volunteers: []
+        })));
+      } catch (err) {
+        console.error('Failed to load events:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
+
+  const filteredEvents = eventsList.filter(event => {
     const matchesSearch = event.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || event.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -219,10 +126,33 @@ const CoordinatorEventManagement = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (validateForm()) {
-      alert("Event saved successfully! (UI Simulation)");
-      closePanel();
+      setSaving(true);
+      try {
+        const payload = {
+          participationType: formData.type.toLowerCase(),
+          maxTeamSize: formData.type === "Team" ? Number(formData.teamSizeMax) : 0,
+          totalSlots: formData.type === "Individual" ? Number(formData.slots) : 0,
+          genderSpecification: {
+            enabled: formData.genderRule !== "None" && formData.genderRule !== "Mixed",
+            type: formData.genderRule === "Only Male" ? "male" : formData.genderRule === "Only Female" ? "female" : "none"
+          },
+          registrationStartDate: formData.regOpenDate,
+          registrationEndDate: formData.regCloseDate,
+          eventDate: formData.startDate || formData.endDate
+        };
+        await coordinatorService.configureEvent(formData.id, payload);
+        alert("Event configured successfully!");
+        
+        // Update local state
+        setEventsList(prev => prev.map(e => e.id === formData.id ? { ...e, ...formData } : e));
+        closePanel();
+      } catch (err) {
+        alert(err.response?.data?.message || "Failed to save configuration");
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -321,9 +251,9 @@ const CoordinatorEventManagement = () => {
                   </button>
                   <button 
                     className="flex-1 py-2 bg-white hover:bg-gray-100 text-gray-700 font-semibold text-sm rounded-lg border border-gray-200 transition-colors shadow-sm"
-                    onClick={() => navigate(event.status === "Completed" ? '/coordinator-results' : '/coordinator-operations')}
+                    onClick={() => navigate(event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)}
                   >
-                    {event.status === "Completed" ? "View Results" : "Manage"}
+                    {event.status === "Completed" ? "View Results" : "View Participants"}
                   </button>
                 </div>
               </div>
@@ -535,8 +465,8 @@ const CoordinatorEventManagement = () => {
                 <button onClick={closePanel} className="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm font-bold rounded-lg transition-colors">
                   Cancel
                 </button>
-                <button onClick={handleSave} className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
-                  Save Changes
+                <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold rounded-lg shadow-sm transition-colors disabled:opacity-60">
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </>

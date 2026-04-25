@@ -1,24 +1,8 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import * as coordinatorService from "../services/coordinatorService";
 
-// --- MOCK DATA ---
-const mockEvent = {
-  id: 1,
-  name: "Hackathon 2026: The Future of AI",
-  type: "Team",
-  status: "Completed",
-  totalParticipants: 120,
-  dateCompleted: "Mar 12, 2026",
-};
-
-const mockParticipants = [
-  { id: 101, name: "Alpha Brains", teamName: "Alpha Brains" },
-  { id: 102, name: "Beta Coders", teamName: "Beta Coders" },
-  { id: 103, name: "Gamma Ray", teamName: "Gamma Ray" },
-  { id: 104, name: "Delta Force", teamName: "Delta Force" },
-  { id: 105, name: "Echo Logic", teamName: "Echo Logic" },
-  { id: 106, name: "Omega Systems", teamName: "Omega Systems" },
-];
+// --- MOCK DATA FOR ANALYTICS/LOGS (To be replaced later) ---
 
 const mockAnalytics = {
   totalRegistrations: 200,
@@ -136,6 +120,11 @@ const CertificatePreview = ({ template, participantName, eventName, position, da
 // --- MAIN PAGE ---
 export default function CoordinatorResultsModule() {
   const navigate = useNavigate();
+  const { eventId } = useParams();
+
+  const [event, setEvent] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Results State
   const [rank1, setRank1] = useState("");
@@ -144,6 +133,48 @@ export default function CoordinatorResultsModule() {
   const [specialMentions, setSpecialMentions] = useState([]);
   const [resultsSaved, setResultsSaved] = useState(false);
   const [resultsError, setResultsError] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const events = await coordinatorService.getAssignedEvents();
+        const foundEvent = events.find(e => e._id === eventId);
+        
+        if (foundEvent) {
+          setEvent({
+            id: foundEvent._id,
+            name: foundEvent.title,
+            type: foundEvent.participationType === 'team' ? 'Team' : 'Individual',
+            status: foundEvent.status,
+            totalParticipants: foundEvent.participants?.length || 0,
+            dateCompleted: new Date().toLocaleDateString()
+          });
+        }
+
+        try {
+          const participantsData = await coordinatorService.getEventParticipants(eventId);
+          // Get unique teams if team event, else individuals
+          const mapped = (participantsData || []).map(p => ({
+            id: p.user?._id || p._id,
+            name: p.team?.name || p.user?.name || "Unknown",
+            teamName: p.team?.name || null
+          }));
+          
+          // Unique entries by name (helpful for teams)
+          const uniqueParticipants = Array.from(new Map(mapped.map(item => [item.name, item])).values());
+          setParticipants(uniqueParticipants);
+        } catch (err) {
+          console.error("Failed to fetch participants");
+        }
+      } catch (err) {
+        console.error("Failed to fetch event data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (eventId) fetchData();
+  }, [eventId]);
 
   // Certificates State
   const [certType, setCertType] = useState("Participation Certificate");
@@ -156,10 +187,10 @@ export default function CoordinatorResultsModule() {
     setSpecialMentions(value);
   };
 
-  const saveResults = () => {
+  const saveResults = async () => {
     // Validation
-    if (!rank1) {
-      setResultsError("Rank 1 is mandatory to declare results.");
+    if (!rank1 || !rank2 || !rank3) {
+      setResultsError("Rank 1, 2, and 3 are mandatory to declare results.");
       return;
     }
     
@@ -171,9 +202,18 @@ export default function CoordinatorResultsModule() {
       return;
     }
 
-    setResultsError("");
-    setResultsSaved(true);
-    alert("Results declared successfully! Certificates are now unlocked.");
+    try {
+      await coordinatorService.saveResult(eventId, {
+        winner: rank1,
+        runnerUp: rank2,
+        top3: [rank1, rank2, rank3]
+      });
+      setResultsError("");
+      setResultsSaved(true);
+      alert("Results declared successfully! Certificates are now unlocked.");
+    } catch (err) {
+      setResultsError(err.response?.data?.message || "Failed to save results.");
+    }
   };
 
   const resetResults = () => {
@@ -185,9 +225,13 @@ export default function CoordinatorResultsModule() {
     setResultsError("");
   };
 
-  const generateCertificates = () => {
-    console.log(`Generating ${certType} using ${certTemplate} template for all eligible participants...`);
-    alert(`Successfully generated ${certType}s!`);
+  const generateCertificates = async () => {
+    try {
+      await coordinatorService.generateCertificates(eventId);
+      alert(`Successfully generated certificates! They are now available to participants.`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to generate certificates.");
+    }
   };
 
   // Certificate Preview Logic
@@ -224,19 +268,19 @@ export default function CoordinatorResultsModule() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{mockEvent.name}</h1>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{event?.name || 'Loading...'}</h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-700 text-white uppercase tracking-wider">
-                {mockEvent.status}
+                {event?.status || 'Completed'}
               </span>
             </div>
             <p className="text-sm text-gray-500 font-medium">
-              <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600 mr-2">{mockEvent.type} Event</span>
-              Completed on {mockEvent.dateCompleted}
+              <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600 mr-2">{event?.type || ''} Event</span>
+              Completed on {event?.dateCompleted || ''}
             </p>
           </div>
           <div className="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100 text-right">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Participants</p>
-            <p className="text-xl font-extrabold text-gray-800">{mockEvent.totalParticipants}</p>
+            <p className="text-xl font-extrabold text-gray-800">{event?.totalParticipants || 0}</p>
           </div>
         </div>
 
@@ -268,7 +312,7 @@ export default function CoordinatorResultsModule() {
                       className={`w-full text-sm py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 transition-colors ${resultsSaved ? "bg-gray-50 text-gray-500" : "bg-white border-gray-200"}`}
                     >
                       <option value="">Select Team</option>
-                      {mockParticipants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -278,7 +322,7 @@ export default function CoordinatorResultsModule() {
                       className={`w-full text-sm py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 transition-colors ${resultsSaved ? "bg-gray-50 text-gray-500" : "bg-white border-gray-200"}`}
                     >
                       <option value="">Select Team</option>
-                      {mockParticipants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -288,7 +332,7 @@ export default function CoordinatorResultsModule() {
                       className={`w-full text-sm py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 transition-colors ${resultsSaved ? "bg-gray-50 text-gray-500" : "bg-white border-gray-200"}`}
                     >
                       <option value="">Select Team</option>
-                      {mockParticipants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -299,7 +343,7 @@ export default function CoordinatorResultsModule() {
                     multiple disabled={resultsSaved} value={specialMentions} onChange={handleSpecialMentionChange}
                     className={`w-full text-sm py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 transition-colors h-24 ${resultsSaved ? "bg-gray-50 text-gray-500" : "bg-white border-gray-200"}`}
                   >
-                    {mockParticipants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                    {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <p className="text-[10px] text-gray-400 mt-1">Hold CTRL/CMD to select multiple.</p>
                 </div>
@@ -363,7 +407,7 @@ export default function CoordinatorResultsModule() {
                         className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
                       >
                         <option value="">Generic Preview</option>
-                        {mockParticipants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        {participants.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
                     </div>
                   </div>
@@ -374,10 +418,10 @@ export default function CoordinatorResultsModule() {
                     <div className="w-full max-w-[280px]">
                       <CertificatePreview 
                         template={certTemplate}
-                        eventName={mockEvent.name}
+                        eventName={event?.name}
                         participantName={previewParticipant}
                         position={getPreviewPosition()}
-                        date={mockEvent.dateCompleted}
+                        date={event?.dateCompleted}
                       />
                     </div>
                   </div>
@@ -389,7 +433,7 @@ export default function CoordinatorResultsModule() {
                   </button>
                   <button disabled={!resultsSaved} onClick={generateCertificates} className="px-6 py-2 text-sm font-bold bg-gray-900 text-white hover:bg-gray-800 rounded-lg shadow-sm transition-colors flex items-center gap-2">
                     <span>Generate All</span>
-                    <span className="bg-gray-700 text-xs px-1.5 py-0.5 rounded">{certType === "Participation Certificate" ? mockEvent.totalParticipants : [rank1, rank2, rank3, ...specialMentions].filter(Boolean).length}</span>
+                    <span className="bg-gray-700 text-xs px-1.5 py-0.5 rounded">{certType === "Participation Certificate" ? event?.totalParticipants || 0 : [rank1, rank2, rank3, ...specialMentions].filter(Boolean).length}</span>
                   </button>
                 </div>
               </div>

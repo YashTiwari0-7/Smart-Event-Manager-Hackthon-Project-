@@ -28,8 +28,8 @@ const eventSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['upcoming', 'ongoing', 'completed'],
-            default: 'upcoming'
+            enum: ['open', 'closed', 'live', 'completed'],
+            default: 'open'
         },
 
         participationType: {
@@ -38,6 +38,16 @@ const eventSchema = new mongoose.Schema(
         },
 
         maxTeamSize: {
+            type: Number,
+            default: 0
+        },
+
+        minTeamSize: {
+            type: Number,
+            default: 0
+        },
+
+        totalTeams: {
             type: Number,
             default: 0
         },
@@ -70,6 +80,13 @@ const eventSchema = new mongoose.Schema(
         registrationStartDate: Date,
         registrationEndDate: Date,
         eventDate: Date,
+
+        volunteers: [
+            {
+                name: { type: String, required: true },
+                phone: { type: String, required: true }
+            }
+        ],
 
         participants: [
             {
@@ -109,6 +126,11 @@ const eventSchema = new mongoose.Schema(
                     ref: 'User'
                 }
             ]
+        },
+
+        resultsFinalized: {
+            type: Boolean,
+            default: false
         }
     },
     { timestamps: true }

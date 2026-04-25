@@ -13,6 +13,12 @@ const getAllEvents = asyncHandler(async (req, res) => {
     res.json(events);
 });
 
+const getEventById = asyncHandler(async (req, res) => {
+    const event = await eventService.getEventById(req.params.id);
+
+    res.json(event);
+});
+
 const updateEvent = asyncHandler(async (req, res) => {
     const event = await eventService.updateEvent(req.params.id, req.body);
 
@@ -25,8 +31,26 @@ const deleteEvent = asyncHandler(async (req, res) => {
     res.json({ message: 'Event deleted successfully' });
 });
 
+const getEventParticipants = asyncHandler(async (req, res) => {
+    const participants = await eventService.getEventParticipantsForAdmin(req.params.id);
+
+    res.json(participants);
+});
+
 const getPendingCoordinators = asyncHandler(async (req, res) => {
     const coordinators = await eventService.getPendingCoordinators();
+
+    res.json(coordinators);
+});
+
+const getApprovedCoordinators = asyncHandler(async (req, res) => {
+    const coordinators = await eventService.getApprovedCoordinators();
+
+    res.json(coordinators);
+});
+
+const getAllCoordinators = asyncHandler(async (req, res) => {
+    const coordinators = await eventService.getAllCoordinators();
 
     res.json(coordinators);
 });
@@ -40,11 +64,46 @@ const approveCoordinator = asyncHandler(async (req, res) => {
     });
 });
 
+const createCoordinator = asyncHandler(async (req, res) => {
+    const coordinator = await eventService.createCoordinatorByAdmin(req.body);
+
+    res.status(201).json({
+        message: 'Coordinator created successfully. Credentials sent via email.',
+        coordinator
+    });
+});
+
+const deleteCoordinator = asyncHandler(async (req, res) => {
+    await eventService.deleteCoordinator(req.params.id);
+
+    res.json({ message: 'Coordinator deleted successfully' });
+});
+
+const getCoordinatorDetails = asyncHandler(async (req, res) => {
+    const details = await eventService.getCoordinatorDetails(req.params.id);
+
+    res.json(details);
+});
+
+const getAdminStats = asyncHandler(async (req, res) => {
+    const stats = await eventService.getAdminStats();
+
+    res.json(stats);
+});
+
 module.exports = {
     createEvent,
     getAllEvents,
+    getEventById,
     updateEvent,
     deleteEvent,
+    getEventParticipants,
     getPendingCoordinators,
-    approveCoordinator
+    getApprovedCoordinators,
+    getAllCoordinators,
+    approveCoordinator,
+    createCoordinator,
+    deleteCoordinator,
+    getCoordinatorDetails,
+    getAdminStats
 };

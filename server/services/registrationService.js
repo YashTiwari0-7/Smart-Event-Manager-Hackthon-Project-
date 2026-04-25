@@ -86,12 +86,16 @@ const validateIndividualSlots = async ({ event, participant }) => {
     const reservedSlots = genderSpecification.reservedSlots || 0;
     const remainingSlots = event.totalSlots - reservedSlots;
 
-    if (participant.gender === reservedType && counts.reservedGenderCount >= reservedSlots) {
-        throw new AppError(`Reserved ${reservedType} slots are full`, 400);
-    }
+    const openSlotsTaken = counts.otherGenderCount + Math.max(0, counts.reservedGenderCount - reservedSlots);
 
-    if (participant.gender !== reservedType && counts.otherGenderCount >= remainingSlots) {
-        throw new AppError('Open slots are full', 400);
+    if (participant.gender === reservedType) {
+        if (counts.reservedGenderCount >= reservedSlots && openSlotsTaken >= remainingSlots) {
+            throw new AppError(`Both reserved and open slots are full`, 400);
+        }
+    } else {
+        if (openSlotsTaken >= remainingSlots) {
+            throw new AppError('Open slots are full', 400);
+        }
     }
 };
 
@@ -381,6 +385,10 @@ const joinTeam = async ({ eventId, userId, invitationCode }) => {
 const withdrawFromEvent = async ({ eventId, userId }) => {
     const event = await getEventForRegistration(eventId);
 
+    if (event.registrationEndDate && new Date(event.registrationEndDate) < new Date()) {
+        throw new AppError('Registration period has ended. Withdrawal is no longer allowed.', 400);
+    }
+
     const registration = await Registration.findOne({
         user: userId,
         event: event._id,
@@ -416,7 +424,7 @@ const getParticipationHistory = async (userId) => {
         .sort({ createdAt: -1 });
 
     return registrations.filter((registration) => {
-        return registration.event && registration.event.status === 'completed';
+        return registration.event;
     });
 };
 

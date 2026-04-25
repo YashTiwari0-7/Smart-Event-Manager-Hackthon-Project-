@@ -52,6 +52,7 @@ export default function AdminEventsModule() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [coordSearch, setCoordSearch] = useState("");
   const [selectedCoords, setSelectedCoords] = useState([]);
+  const [availableCoordinators, setAvailableCoordinators] = useState([]);
   
   // API state
   const [eventsList, setEventsList] = useState([]);
@@ -59,6 +60,25 @@ export default function AdminEventsModule() {
   const [error, setError] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "" });
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState({ id: "", title: "", description: "" });
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Fetch coordinators when opening create/edit modal
+  useEffect(() => {
+    if ((isCreateModalOpen || isEditModalOpen) && availableCoordinators.length === 0) {
+      const fetchCoords = async () => {
+        try {
+          const coords = await adminService.getApprovedCoordinators();
+          setAvailableCoordinators(coords || []);
+        } catch (err) {
+          console.error("Failed to fetch coordinators", err);
+        }
+      };
+      fetchCoords();
+    }
+  }, [isCreateModalOpen, isEditModalOpen]);
 
   // Fetch events from API
   useEffect(() => {
@@ -96,15 +116,56 @@ export default function AdminEventsModule() {
       const created = await adminService.createEvent({
         title: newEvent.title,
         description: newEvent.description,
-        coordinators: []
+        coordinators: selectedCoords.map(c => c._id)
       });
       setEventsList(prev => [created, ...prev]);
       setIsCreateModalOpen(false);
       setNewEvent({ title: "", description: "" });
+      setSelectedCoords([]);
     } catch (err) {
       alert(err.response?.data?.message || "Failed to create event");
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const openEditModal = () => {
+    setEditEvent({
+      id: selectedEventDetail._id,
+      title: selectedEventDetail.title,
+      description: selectedEventDetail.description || ""
+    });
+    setSelectedCoords(selectedEventDetail.coordinators || []);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!editEvent.title) return alert("Event name is required");
+    setEditLoading(true);
+    try {
+      const updated = await adminService.updateEvent(editEvent.id, {
+        title: editEvent.title,
+        description: editEvent.description,
+        coordinators: selectedCoords.map(c => c._id)
+      });
+      setEventsList(prev => prev.map(e => e._id === updated._id ? updated : e));
+      setSelectedEventDetail(updated);
+      setIsEditModalOpen(false);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update event");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!window.confirm("Are you sure you want to delete this event? This action cannot be undone.")) return;
+    try {
+      await adminService.deleteEvent(selectedEventId);
+      setEventsList(prev => prev.filter(e => e._id !== selectedEventId));
+      handleBackToList();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete event");
     }
   };
 
@@ -127,8 +188,19 @@ export default function AdminEventsModule() {
       return new Date(b.date || 0) - new Date(a.date || 0);
     });
 
-  const filteredAvailableCoords = [];
-  const toggleCoord = (coord) => {};
+  const filteredAvailableCoords = availableCoordinators.filter(c => 
+    c.name.toLowerCase().includes(coordSearch.toLowerCase()) &&
+    !selectedCoords.some(selected => selected._id === c._id)
+  );
+  
+  const toggleCoord = (coord) => {
+    if (selectedCoords.some(c => c._id === coord._id)) {
+      setSelectedCoords(selectedCoords.filter(c => c._id !== coord._id));
+    } else {
+      setSelectedCoords([...selectedCoords, coord]);
+      setCoordSearch("");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-12">
@@ -255,9 +327,15 @@ export default function AdminEventsModule() {
                   </div>
                   <p className="text-base text-gray-600">{selectedEventDetail?.description || ''}</p>
                 </div>
-                <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-200">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Coordinators</p>
-                  <p className="text-sm font-medium text-gray-800">{(selectedEventDetail?.coordinators || []).map(c => c.name || c).join(", ") || 'None assigned'}</p>
+                <div className="flex flex-col gap-3 items-end">
+                  <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-200">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Coordinators</p>
+                    <p className="text-sm font-medium text-gray-800">{(selectedEventDetail?.coordinators || []).map(c => c.name || c).join(", ") || 'None assigned'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={openEditModal} className="px-4 py-2 bg-blue-50 text-blue-600 font-bold text-xs rounded-lg border border-blue-200 hover:bg-blue-100 transition">Edit Event</button>
+                    <button onClick={handleDeleteEvent} className="px-4 py-2 bg-red-50 text-red-600 font-bold text-xs rounded-lg border border-red-200 hover:bg-red-100 transition">Delete</button>
+                  </div>
                 </div>
               </div>
 
@@ -434,8 +512,8 @@ export default function AdminEventsModule() {
                 <div className="border border-gray-300 focus-within:ring-2 focus-within:ring-gray-200 rounded-lg bg-white p-2 transition-all">
                   <div className="flex flex-wrap gap-2 mb-2">
                     {selectedCoords.map(c => (
-                      <span key={c} className="bg-gray-100 border border-gray-200 text-xs font-bold px-2 py-1 rounded flex items-center gap-1 text-gray-700">
-                        {c} <button onClick={() => toggleCoord(c)} className="text-gray-400 hover:text-gray-700">✕</button>
+                      <span key={c._id} className="bg-gray-100 border border-gray-200 text-xs font-bold px-2 py-1 rounded flex items-center gap-1 text-gray-700">
+                        {c.name} <button onClick={() => toggleCoord(c)} className="text-gray-400 hover:text-gray-700">✕</button>
                       </span>
                     ))}
                   </div>
@@ -447,8 +525,8 @@ export default function AdminEventsModule() {
                     {coordSearch && filteredAvailableCoords.length > 0 && (
                       <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-40 overflow-y-auto">
                         {filteredAvailableCoords.map(c => (
-                          <div key={c} onClick={() => toggleCoord(c)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
-                            {c}
+                          <div key={c._id} onClick={() => toggleCoord(c)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                            {c.name} ({c.email})
                           </div>
                         ))}
                       </div>
@@ -468,6 +546,80 @@ export default function AdminEventsModule() {
                 className="px-6 py-2 bg-gray-900 text-white hover:bg-gray-800 text-sm font-bold rounded-lg shadow-sm transition-colors disabled:opacity-60"
               >
                 Create Event
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
+      {/* ========================================= */}
+      {/* MODAL: EDIT EVENT PANEL                   */}
+      {/* ========================================= */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm fade-in">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col relative">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-extrabold text-gray-900">Edit Event</h2>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-800 transition-colors font-bold p-1">✕</button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 bg-white relative">
+              
+              {/* Form Fields */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Event Name</label>
+                <input type="text" placeholder="e.g. Annual Tech Symposium" value={editEvent.title} onChange={(e) => setEditEvent(p => ({...p, title: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gray-200 focus:outline-none rounded-lg bg-white text-gray-900 text-sm transition-all" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Description</label>
+                <textarea placeholder="Brief details about the event..." rows="3" value={editEvent.description} onChange={(e) => setEditEvent(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gray-200 focus:outline-none rounded-lg bg-white text-gray-900 text-sm transition-all"></textarea>
+              </div>
+
+              {/* Assign Coordinators */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Assign Coordinators</label>
+                <div className="border border-gray-300 focus-within:ring-2 focus-within:ring-gray-200 rounded-lg bg-white p-2 transition-all">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {selectedCoords.map(c => (
+                      <span key={c._id || c} className="bg-gray-100 border border-gray-200 text-xs font-bold px-2 py-1 rounded flex items-center gap-1 text-gray-700">
+                        {c.name || 'Coordinator'} <button onClick={() => toggleCoord(c)} className="text-gray-400 hover:text-gray-700">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text" placeholder="Search coordinators..." value={coordSearch} onChange={(e) => setCoordSearch(e.target.value)}
+                      className="w-full bg-transparent text-sm focus:outline-none px-1 text-gray-900"
+                    />
+                    {coordSearch && filteredAvailableCoords.length > 0 && (
+                      <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-40 overflow-y-auto">
+                        {filteredAvailableCoords.map(c => (
+                          <div key={c._id} onClick={() => toggleCoord(c)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                            {c.name} ({c.email})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors">
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdateEvent} disabled={editLoading}
+                className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 text-sm font-bold rounded-lg shadow-sm transition-colors disabled:opacity-60"
+              >
+                Save Changes
               </button>
             </div>
             

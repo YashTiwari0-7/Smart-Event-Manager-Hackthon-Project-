@@ -22,18 +22,6 @@ export const verifyParticipantOtp = async (email, otp) => {
     return data;
 };
 
-// Coordinator registration — Step 1: request OTP
-export const registerCoordinator = async (formData) => {
-    const { data } = await api.post('/coordinator/register', formData);
-    return data;
-};
-
-// Coordinator registration — Step 2: verify OTP
-export const verifyCoordinatorOtp = async (email, otp) => {
-    const { data } = await api.post('/coordinator/verify-otp', { email, otp });
-    return data;
-};
-
 // Password Reset — Step 1: request OTP
 export const requestPasswordReset = async (email) => {
     const { data } = await api.post('/password-reset/request', { email });

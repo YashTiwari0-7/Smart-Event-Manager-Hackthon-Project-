@@ -62,10 +62,10 @@ const EventCard = ({ event, navigate }) => {
           Configure
         </button>
         <button 
-          onClick={() => navigate(event.status === "Completed" ? "/coordinator-results" : "/coordinator-operations")} 
+          onClick={() => navigate(event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)} 
           className="flex-1 py-2.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg border border-gray-200 transition-colors shadow-sm"
         >
-          {event.status === "Completed" ? "View Results" : "Manage"}
+          {event.status === "Completed" ? "View Results" : "View Participants"}
         </button>
       </div>
     </div>

@@ -13,6 +13,20 @@ const getEventAnalytics = asyncHandler(async (req, res) => {
     res.json(analytics);
 });
 
+const getOverallAnalytics = asyncHandler(async (req, res) => {
+    const analytics = await analyticsService.getOverallAnalytics();
+
+    res.json(analytics);
+});
+
+const getCoordinatorAnalytics = asyncHandler(async (req, res) => {
+    const analytics = await analyticsService.getCoordinatorAnalytics(req.params.id);
+
+    res.json(analytics);
+});
+
 module.exports = {
-    getEventAnalytics
+    getEventAnalytics,
+    getOverallAnalytics,
+    getCoordinatorAnalytics
 };

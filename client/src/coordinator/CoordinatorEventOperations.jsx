@@ -1,28 +1,8 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import * as coordinatorService from "../services/coordinatorService";
 
-// --- Mock Data ---
-const initialEvent = {
-  id: 1,
-  name: "Hackathon 2026: The Future of AI",
-  type: "Team",
-  status: "Closed", // Draft -> Open -> Closed -> Live -> Completed
-  startDate: "Mar 10, 2026",
-  endDate: "Mar 12, 2026",
-};
-
-const initialParticipants = [
-  { id: 101, name: "Alice Smith", email: "alice@college.edu", status: "Confirmed", attendance: null, teamName: "Alpha Brains" },
-  { id: 102, name: "Bob Jones", email: "bob@college.edu", status: "Confirmed", attendance: null, teamName: "Alpha Brains" },
-  { id: 103, name: "Charlie Brown", email: "charlie@college.edu", status: "Waitlisted", attendance: null, teamName: "Beta Coders" },
-  { id: 104, name: "Diana Prince", email: "diana@college.edu", status: "Confirmed", attendance: null, teamName: "Beta Coders" },
-  { id: 105, name: "Eve Davis", email: "eve@college.edu", status: "Dropped", attendance: null, teamName: "Gamma Ray" },
-  { id: 106, name: "Frank White", email: "frank@college.edu", status: "Confirmed", attendance: null, teamName: "Gamma Ray" },
-  { id: 107, name: "Grace Lee", email: "grace@college.edu", status: "Confirmed", attendance: null, teamName: "Delta Force" },
-  { id: 108, name: "Hank Pym", email: "hank@college.edu", status: "Waitlisted", attendance: null, teamName: "Delta Force" },
-  { id: 109, name: "Ivy Chen", email: "ivy@college.edu", status: "Confirmed", attendance: null, teamName: "Alpha Brains" },
-  { id: 110, name: "Jack Black", email: "jack@college.edu", status: "Confirmed", attendance: null, teamName: "Beta Coders" },
-];
+// --- No Mock Data ---
 
 // --- Sub-components ---
 const StatusBadge = ({ status }) => {
@@ -56,12 +36,67 @@ const ParticipantStatusBadge = ({ status }) => {
 // --- Main Page ---
 const CoordinatorEventOperations = () => {
   const navigate = useNavigate();
+  const { eventId } = useParams();
 
   // State
-  const [event, setEvent] = useState(initialEvent);
-  const [participants, setParticipants] = useState(initialParticipants);
+  const [event, setEvent] = useState(null);
+  const [participants, setParticipants] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [loading, setLoading] = useState(true);
+
+  // Status map
+  const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed', draft: 'Draft', closed: 'Closed' };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Get all events and find the one we need
+        const events = await coordinatorService.getAssignedEvents();
+        const foundEvent = events.find(e => e._id === eventId);
+        
+        if (foundEvent) {
+          setEvent({
+            id: foundEvent._id,
+            name: foundEvent.title,
+            type: foundEvent.participationType === 'team' ? 'Team' : 'Individual',
+            status: statusDisplayMap[foundEvent.status] || 'Draft',
+            startDate: foundEvent.registrationStartDate,
+            endDate: foundEvent.eventDate
+          });
+        }
+
+        // Get participants
+        try {
+          const participantsData = await coordinatorService.getEventParticipants(eventId);
+          // Map to match component structure
+          setParticipants((participantsData || []).map(p => ({
+            id: p.user?._id || p._id,
+            name: p.user?.name || "Unknown User",
+            email: p.user?.email || "",
+            status: p.status === "registered" ? "Confirmed" : "Waitlisted",
+            attendance: p.attended ? "present" : null,
+            teamName: p.team?.name || null
+          })));
+        } catch (err) {
+          console.error("Failed to fetch participants:", err);
+          setParticipants([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch event data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (eventId) {
+      fetchData();
+    }
+  }, [eventId]);
+
+  if (loading) return <div className="p-8 text-center">Loading event operations...</div>;
+  if (!event) return <div className="p-8 text-center text-red-500">Event not found.</div>;
 
   // State Machine Logic
   const getNextStateAction = () => {
@@ -79,30 +114,66 @@ const CoordinatorEventOperations = () => {
   const isLive = event.status === "Live";
   const isCompleted = event.status === "Completed";
 
-  const advanceState = () => {
+  const advanceState = async () => {
     if (action) {
-      if (action.nextState === "Live" && !window.confirm("Are you sure you want to START the event? Attendance will be unlocked.")) return;
-      if (action.nextState === "Completed" && !window.confirm("Are you sure you want to END the event? This action cannot be undone.")) return;
-      
-      setEvent(prev => ({ ...prev, status: action.nextState }));
+      if (action.nextState === "Live") {
+        if (!window.confirm("Are you sure you want to START the event? Attendance will be unlocked.")) return;
+        try {
+          await coordinatorService.startEvent(eventId);
+          setEvent(prev => ({ ...prev, status: "Live" }));
+          alert("Event started successfully!");
+        } catch (err) {
+          alert("Failed to start event.");
+        }
+      } else if (action.nextState === "Completed") {
+        if (!window.confirm("Are you sure you want to END the event? This action cannot be undone.")) return;
+        try {
+          await coordinatorService.endEvent(eventId);
+          setEvent(prev => ({ ...prev, status: "Completed" }));
+          alert("Event ended successfully!");
+          navigate(`/coordinator-results/${eventId}`);
+        } catch (err) {
+          alert("Failed to end event.");
+        }
+      } else {
+        // Just UI update for other states for now, backend might not have draft/open transitions
+        setEvent(prev => ({ ...prev, status: action.nextState }));
+      }
     }
   };
 
   // Attendance Handlers
-  const toggleAttendance = (id, value) => {
+  const toggleAttendance = async (id, value) => {
     if (!isLive) return;
-    setParticipants(prev => prev.map(p => p.id === id ? { ...p, attendance: value } : p));
+    try {
+      // In a real app we might pass just one ID, but the backend accepts an array of userIds
+      await coordinatorService.markAttendance(eventId, [id]);
+      setParticipants(prev => prev.map(p => p.id === id ? { ...p, attendance: value } : p));
+    } catch (err) {
+      alert("Failed to mark attendance.");
+    }
   };
 
-  const bulkMarkAttendance = (value) => {
+  const bulkMarkAttendance = async (value) => {
     if (!isLive) return;
-    setParticipants(prev => prev.map(p => {
-      // Only mark confirmed participants
-      if (p.status === "Confirmed") {
-        return { ...p, attendance: value };
+    try {
+      const confirmedIds = participants.filter(p => p.status === "Confirmed").map(p => p.id);
+      if (confirmedIds.length === 0) return;
+      
+      if (value === 'present') {
+        // Assume backend only marks present or doesn't support bulk absent
+        await coordinatorService.markAttendance(eventId, confirmedIds);
       }
-      return p;
-    }));
+      
+      setParticipants(prev => prev.map(p => {
+        if (p.status === "Confirmed") {
+          return { ...p, attendance: value };
+        }
+        return p;
+      }));
+    } catch (err) {
+      alert("Failed to bulk mark attendance.");
+    }
   };
 
   // Derived Data

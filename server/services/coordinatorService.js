@@ -1,15 +1,10 @@
 const Attendance = require('../models/attendanceModel');
 const Registration = require('../models/registrationModel');
+const Event = require('../models/eventModel');
 const AppError = require('../utils/appError');
 const { getAssignedEvent } = require('./eventService');
 const { generateCertificatesForUsers } = require('./certificateService');
 const { assertObjectIdList } = require('../utils/validators');
-
-const toDateKey = (date) => {
-    const value = new Date(date);
-
-    return `${value.getFullYear()}-${value.getMonth() + 1}-${value.getDate()}`;
-};
 
 const assertRegisteredUsers = async ({ eventId, userIds, message }) => {
     const registrations = await Registration.find({
@@ -34,6 +29,35 @@ const getAttendedUserIds = async (eventId) => {
     return attendance.map((item) => String(item.user));
 };
 
+const getCoordinatorStats = async (coordinatorId) => {
+    const events = await Event.find({ coordinators: coordinatorId });
+
+    const totalAssigned = events.length;
+    const upcoming = events.filter(e => e.status === 'open').length;
+    const completed = events.filter(e => e.status === 'completed').length;
+
+    const eventIds = events.map(e => e._id);
+    const totalParticipants = await Registration.countDocuments({
+        event: { $in: eventIds },
+        status: 'registered'
+    });
+
+    return { totalAssigned, upcoming, completed, totalParticipants };
+};
+
+const endRegistration = async ({ eventId, coordinatorId }) => {
+    const event = await getAssignedEvent(eventId, coordinatorId);
+
+    if (event.status !== 'open') {
+        throw new AppError('Registration can only be ended for open events', 400);
+    }
+
+    event.status = 'closed';
+    await event.save();
+
+    return { message: 'Registration closed successfully', event };
+};
+
 const startEvent = async ({ eventId, coordinatorId }) => {
     const event = await getAssignedEvent(eventId, coordinatorId);
 
@@ -41,29 +65,30 @@ const startEvent = async ({ eventId, coordinatorId }) => {
         throw new AppError('Event date is not configured', 400);
     }
 
-    if (event.status !== 'upcoming') {
-        throw new AppError('Only upcoming events can be started', 400);
+    if (event.status !== 'open' && event.status !== 'closed') {
+        throw new AppError('Only open or closed events can be started', 400);
     }
 
-    if (toDateKey(new Date()) !== toDateKey(event.eventDate)) {
-        throw new AppError('Event can only be started on eventDate', 400);
-    }
-
-    event.status = 'ongoing';
+    event.status = 'live';
     await event.save();
 
-    return {
-        message: 'Event started successfully',
-        event
-    };
+    return { message: 'Event started successfully', event };
+};
+
+const getAttendance = async ({ eventId, coordinatorId }) => {
+    await getAssignedEvent(eventId, coordinatorId);
+
+    return Attendance.find({ event: eventId })
+        .populate('user', 'name email gender')
+        .sort({ createdAt: -1 });
 };
 
 const markAttendance = async ({ eventId, coordinatorId, userIds = [] }) => {
     const event = await getAssignedEvent(eventId, coordinatorId);
     const normalizedUserIds = assertObjectIdList(userIds, 'Invalid participant id');
 
-    if (event.status !== 'ongoing') {
-        throw new AppError('Attendance can only be marked for ongoing events', 400);
+    if (event.status !== 'live') {
+        throw new AppError('Attendance can only be marked for live events', 400);
     }
 
     if (normalizedUserIds.length === 0) {
@@ -104,17 +129,14 @@ const markAttendance = async ({ eventId, coordinatorId, userIds = [] }) => {
 const endEvent = async ({ eventId, coordinatorId }) => {
     const event = await getAssignedEvent(eventId, coordinatorId);
 
-    if (event.status !== 'ongoing') {
-        throw new AppError('Only ongoing events can be ended', 400);
+    if (event.status !== 'live') {
+        throw new AppError('Only live events can be ended', 400);
     }
 
     event.status = 'completed';
     await event.save();
 
-    return {
-        message: 'Event completed successfully',
-        event
-    };
+    return { message: 'Event completed successfully', event };
 };
 
 const saveResult = async ({ eventId, coordinatorId, winner, runnerUp, top3 = [] }) => {
@@ -122,6 +144,10 @@ const saveResult = async ({ eventId, coordinatorId, winner, runnerUp, top3 = [] 
 
     if (event.status !== 'completed') {
         throw new AppError('Results can only be assigned after event completion', 400);
+    }
+
+    if (event.resultsFinalized) {
+        throw new AppError('Results have already been finalized and cannot be changed', 400);
     }
 
     if (!winner || !runnerUp || !Array.isArray(top3) || top3.length !== 3) {
@@ -138,6 +164,12 @@ const saveResult = async ({ eventId, coordinatorId, winner, runnerUp, top3 = [] 
         [winner, runnerUp, ...normalizedTop3].filter(Boolean),
         'Invalid result participant id'
     );
+
+    // Check for duplicates
+    const uniqueIds = new Set(resultIds.map(String));
+    if (uniqueIds.size !== resultIds.length) {
+        throw new AppError('Duplicate selections are not allowed in results', 400);
+    }
 
     await assertRegisteredUsers({
         eventId: event._id,
@@ -158,6 +190,7 @@ const saveResult = async ({ eventId, coordinatorId, winner, runnerUp, top3 = [] 
         top3: normalizedTop3
     };
     event.winners = resultIds;
+    event.resultsFinalized = true;
 
     const updatedEvent = await event.save();
     await updatedEvent.populate('results.winner', 'name email gender');
@@ -210,14 +243,10 @@ const generateEventCertificates = async ({ eventId, coordinatorId }) => {
 };
 
 const exportParticipationList = async ({ eventId, coordinatorId }) => {
-    const event = await getAssignedEvent(eventId, coordinatorId);
-
-    if (event.participationType !== 'individual') {
-        throw new AppError('Participation export is only available for individual events', 400);
-    }
+    await getAssignedEvent(eventId, coordinatorId);
 
     const registrations = await Registration.find({
-        event: event._id,
+        event: eventId,
         status: 'registered'
     })
         .populate('user', 'name email gender phoneNumber institutionName')
@@ -242,7 +271,10 @@ const exportParticipationList = async ({ eventId, coordinatorId }) => {
 };
 
 module.exports = {
+    getCoordinatorStats,
+    endRegistration,
     startEvent,
+    getAttendance,
     markAttendance,
     endEvent,
     saveResult,
