@@ -22,6 +22,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/coordinator', require('./routes/coordinatorRoutes'));
 app.use('/api/participant', require('./routes/participantRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/password-reset', require('./routes/passwordResetRoutes'));
 
 app.use((req, res, next) => {
     next(new AppError('Route not found', 404));
