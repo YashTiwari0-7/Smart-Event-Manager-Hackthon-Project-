@@ -16,9 +16,30 @@ export const registerParticipant = async (formData) => {
     return data;
 };
 
+// Coordinator registration
+export const registerCoordinator = async (formData) => {
+    // Attempting to hit the generic auth or coordinator register endpoint
+    const { data } = await api.post('/auth/register', { ...formData, role: 'coordinator' });
+    return data;
+};
+
+// Coordinator OTP Verify
+export const verifyCoordinatorOtp = async (email, otp) => {
+    // If backend doesn't have an explicit coordinator verify-otp yet, we send to a placeholder
+    const { data } = await api.post('/coordinator/verify-otp', { email, otp });
+    return data;
+};
+
 // Participant registration — Step 2: verify OTP
 export const verifyParticipantOtp = async (email, otp) => {
     const { data } = await api.post('/participant/verify-otp', { email, otp });
+    if (data.token) {
+        // Build user object that matches the login shape
+        const userObj = { ...data.participant, token: data.token };
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(userObj));
+        return userObj;
+    }
     return data;
 };
 

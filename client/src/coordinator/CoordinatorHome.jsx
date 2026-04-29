@@ -2,61 +2,98 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import * as coordinatorService from "../services/coordinatorService";
 
+/* ─── Sub-components ─── */
+
 const StatCard = ({ icon, label, value, color }) => (
-  <div style={{
-    background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", padding: "22px 20px",
-    display: "flex", alignItems: "flex-start", gap: 14, transition: "box-shadow 0.2s, transform 0.2s",
-    cursor: "default", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-  }}
-    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.transform = "none"; }}
-  >
-    <div style={{
-      width: 44, height: 44, borderRadius: 12, background: `${color}15`,
-      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0,
-    }}>{icon}</div>
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: "#111827", lineHeight: 1 }}>{value}</div>
+  <div className="group bg-white rounded-2xl border border-gray-200/80 p-5 flex items-start gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+    <div
+      className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
+      style={{ background: `${color}12` }}
+    >
+      {icon}
+    </div>
+    <div className="min-w-0">
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[28px] font-extrabold text-gray-900 leading-none">{value}</p>
     </div>
   </div>
 );
 
-const EventRow = ({ event, onNavigate }) => (
-  <div style={{
-    display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px",
-    borderBottom: "1px solid #f3f4f6", transition: "background 0.1s",
-  }}
-    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, background: "#f5f3ff",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
-      }}>📅</div>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{event.title}</div>
-        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
-          {event.eventDate ? new Date(event.eventDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "No date set"}
+const EventCard = ({ event, onNavigate }) => {
+  const statusStyles = {
+    open:      "bg-indigo-50 text-indigo-600",
+    live:      "bg-emerald-50 text-emerald-600",
+    closed:    "bg-amber-50 text-amber-600",
+    completed: "bg-gray-100 text-gray-500",
+  };
+
+  return (
+    <div className="group bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col gap-4">
+      {/* Header: Name + Status */}
+      <div className="flex justify-between items-start gap-3">
+        <h3 className="text-base font-bold text-gray-900 leading-snug flex-1 min-w-0 truncate">{event.title}</h3>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize whitespace-nowrap shrink-0 ${statusStyles[event.status] || "bg-gray-100 text-gray-500"}`}>
+          {event.status}
+        </span>
+      </div>
+
+      {/* Reg Dates & Slots */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-gray-50 rounded-lg px-3 py-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Registration</p>
+          <p className="text-xs font-semibold text-gray-700 mt-0.5">
+            {event.registrationStartDate ? new Date(event.registrationStartDate).toLocaleDateString() : "TBD"} - {event.registrationEndDate ? new Date(event.registrationEndDate).toLocaleDateString() : "TBD"}
+          </p>
+        </div>
+        <div className="bg-gray-50 rounded-lg px-3 py-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+            {event.participationType === "individual" ? "Slots" : "Teams"}
+          </p>
+          <p className="text-xs font-semibold text-gray-700 mt-0.5">
+            {event.participationType === "individual" ? (event.totalSlots ?? "—") : (event.totalTeams ?? "—")}
+          </p>
+        </div>
+        {event.participationType === "team" && (
+          <div className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Team Size</p>
+            <p className="text-xs font-semibold text-gray-700 mt-0.5">
+              {event.maxTeamSize ? `${event.maxTeamSize} members` : "—"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Type + Coordinators */}
+      <div className="flex gap-4 text-sm font-semibold text-gray-700 bg-gray-50 rounded-lg px-3 py-2 w-fit">
+        <div className="flex items-center gap-1.5 capitalize pr-4 border-r border-gray-200">
+          👥 {event.participationType || "—"}
+        </div>
+        <div className="flex items-center gap-1.5">
+          👨‍💼 {event.coordinators?.length || 1} Coordinators
         </div>
       </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3 mt-auto pt-2">
+        <button onClick={() => onNavigate("events")} className="flex-1 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-bold text-xs transition-colors">
+          ⚙️ Configure
+        </button>
+        <button onClick={() => onNavigate("events")} className="flex-1 px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-xs transition-colors shadow-sm">
+          👥 View Participants
+        </button>
+      </div>
     </div>
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <span style={{
-        fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, textTransform: "capitalize",
-        background: event.status === "open" ? "#eef2ff" : event.status === "live" ? "#ecfdf5" : event.status === "closed" ? "#fef3c7" : "#f3f4f6",
-        color: event.status === "open" ? "#4f46e5" : event.status === "live" ? "#059669" : event.status === "closed" ? "#d97706" : "#6b7280",
-      }}>{event.status}</span>
-    </div>
-  </div>
-);
+  );
+};
+
+/* ─── Main Component ─── */
 
 export default function CoordinatorHome({ onNavigate }) {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     const load = async () => {
@@ -75,64 +112,110 @@ export default function CoordinatorHome({ onNavigate }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 36, height: 36, border: "3px solid #e5e7eb", borderTop: "3px solid #7c3aed", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-          <p style={{ color: "#9ca3af", fontSize: 13 }}>Loading dashboard…</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-9 h-9 border-[3px] border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-400 text-sm font-medium">Loading dashboard…</p>
         </div>
       </div>
     );
   }
 
-  const upcoming = events.filter(e => e.status === "open");
+  const getFilteredEvents = () => {
+    switch (filter) {
+      case "open": return events.filter(e => e.status === "OPEN");
+      case "live": return events.filter(e => e.status === "LIVE");
+      case "closed": return events.filter(e => e.status === "CLOSED");
+      case "completed": return events.filter(e => e.status === "COMPLETED");
+      default: return events;
+    }
+  };
+
+  const filteredEvents = getFilteredEvents();
+  const filters = ["all", "open", "live", "closed", "completed"];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Welcome */}
-      <div style={{
-        background: "linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)", borderRadius: 16, padding: "28px 32px",
-        color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16,
-      }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Welcome, {user?.name?.split(" ")[0] || "Coordinator"} 👋</h1>
-          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>Manage your assigned events and track participation.</p>
+    <div className="flex flex-col gap-6">
+
+      {/* ── Welcome Banner ── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl px-6 sm:px-8 py-7 text-white shadow-lg">
+        {/* Decorative accent */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/[0.03] rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/[0.02] rounded-full translate-y-1/2 -translate-x-1/4 blur-xl pointer-events-none" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+              Welcome back, {user?.name?.split(" ")[0] || "Coordinator"} 👋
+            </h1>
+            <p className="text-sm text-white/50 mt-1.5 font-medium">
+              Manage your assigned events and track participation.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate("events")}
+            className="shrink-0 bg-white/[0.12] hover:bg-white/[0.2] backdrop-blur-sm text-white border border-white/[0.1] rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-200 hover:shadow-lg"
+          >
+            View All Events →
+          </button>
         </div>
-        <button onClick={() => onNavigate("events")} style={{
-          background: "#7c3aed", color: "#fff", border: "none", borderRadius: 10, padding: "12px 24px",
-          fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "background 0.15s",
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = "#6d28d9"}
-          onMouseLeave={e => e.currentTarget.style.background = "#7c3aed"}
-        >View All Events</button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-        <StatCard icon="📋" label="Total Assigned" value={stats?.totalAssigned || 0} color="#7c3aed" />
-        <StatCard icon="🚀" label="Upcoming Events" value={stats?.upcoming || 0} color="#f59e0b" />
+      {/* ── Stats Grid ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard icon="📋" label="Total Assigned" value={stats?.totalAssigned || 0} color="#374151" />
+        <StatCard icon="🚀" label="Active Events" value={stats?.upcoming || 0} color="#f59e0b" />
         <StatCard icon="✅" label="Completed" value={stats?.completed || 0} color="#10b981" />
-        <StatCard icon="👥" label="Total Participants" value={stats?.totalParticipants || 0} color="#3b82f6" />
+        <StatCard icon="👥" label="Average Participants" value={stats?.totalAssigned ? Math.round(stats?.totalParticipants / stats?.totalAssigned) : 0} color="#3b82f6" />
       </div>
 
-      {/* Upcoming Events */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-        <div style={{
-          padding: "16px 20px", borderBottom: "1px solid #e5e7eb",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111827", margin: 0 }}>Upcoming Events</h3>
-          <button onClick={() => onNavigate("events")} style={{
-            background: "none", border: "none", fontSize: 12, fontWeight: 600, color: "#7c3aed", cursor: "pointer",
-          }}>See all →</button>
+      {/* ── Events Section ── */}
+      <div className="flex flex-col gap-4">
+        {/* Section Header + Filter Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-extrabold text-gray-900">Assigned Events</h3>
+            <p className="text-xs text-gray-400 font-medium mt-0.5">
+              {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""} found
+            </p>
+          </div>
+
+          {/* Filter Chips */}
+          <div className="flex gap-1.5 flex-wrap">
+            {filters.map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold capitalize border transition-all duration-200 ${
+                  filter === f
+                    ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          {upcoming.length === 0 ? (
-            <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>No upcoming events.</div>
-          ) : (
-            upcoming.slice(0, 8).map(e => <EventRow key={e._id} event={e} onNavigate={onNavigate} />)
-          )}
-        </div>
+
+        {/* Events List Grid */}
+        {filteredEvents.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm py-16 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mx-auto mb-3">
+              📭
+            </div>
+            <p className="text-sm font-semibold text-gray-400">
+              No {filter !== "all" ? filter : ""} events found.
+            </p>
+            <p className="text-xs text-gray-300 mt-1">
+              {filter !== "all" ? "Try switching to a different filter." : "Events will appear here once assigned."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredEvents.map(e => <EventCard key={e._id} event={e} onNavigate={onNavigate} />)}
+          </div>
+        )}
       </div>
     </div>
   );

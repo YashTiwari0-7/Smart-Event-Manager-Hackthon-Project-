@@ -5,6 +5,7 @@ const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const { ROLES } = require('../utils/authConstants');
 const { sendOtpEmail } = require('./emailService');
+const generateToken = require('../utils/generateToken');
 
 const OTP_EXPIRY_MINUTES = 10;
 
@@ -127,7 +128,8 @@ const verifyParticipantOtp = async ({ email, otp }) => {
             email: participant.email,
             role: participant.role,
             isApproved: participant.isApproved
-        }
+        },
+        token: generateToken(participant._id, participant.role)
     };
 };
 

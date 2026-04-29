@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as coordinatorService from "../services/coordinatorService";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
-const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed' };
+const statusDisplayMap = { OPEN: 'Open', CLOSED: 'Closed', LIVE: 'Live', COMPLETED: 'Completed' };
 
 const categories = ["Technical", "Workshop", "Conference", "Exhibition", "Cultural", "Sports"];
 const genderRules = ["None", "Only Male", "Only Female", "Mixed"];
@@ -28,6 +29,7 @@ const Badge = ({ status }) => {
 const CoordinatorEventManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -143,13 +145,13 @@ const CoordinatorEventManagement = () => {
           eventDate: formData.startDate || formData.endDate
         };
         await coordinatorService.configureEvent(formData.id, payload);
-        alert("Event configured successfully!");
+        showToast("Event configured successfully!");
         
         // Update local state
         setEventsList(prev => prev.map(e => e.id === formData.id ? { ...e, ...formData } : e));
         closePanel();
       } catch (err) {
-        alert(err.response?.data?.message || "Failed to save configuration");
+        showToast(err.response?.data?.message || "Failed to save configuration", "error");
       } finally {
         setSaving(false);
       }

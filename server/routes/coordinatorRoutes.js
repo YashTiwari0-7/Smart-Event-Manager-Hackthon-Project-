@@ -6,6 +6,7 @@ const {
     getAssignedEventById,
     configureEventSettings,
     getEventParticipants,
+    getEventTeams,
     endRegistration,
     startEvent,
     getAttendance,
@@ -27,6 +28,7 @@ router.get('/events', getAssignedEvents);
 router.get('/event/:id', getAssignedEventById);
 router.put('/event/:id/config', configureEventSettings);
 router.get('/event/:id/participants', getEventParticipants);
+router.get('/event/:id/teams', getEventTeams);
 router.post('/event/:id/end-registration', endRegistration);
 router.post('/event/:id/start', startEvent);
 router.get('/event/:id/attendance', getAttendance);

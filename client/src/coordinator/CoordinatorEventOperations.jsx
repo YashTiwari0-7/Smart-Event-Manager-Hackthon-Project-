@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as coordinatorService from "../services/coordinatorService";
+import { useToast } from "../context/ToastContext";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 // --- No Mock Data ---
 
@@ -9,9 +11,13 @@ const StatusBadge = ({ status }) => {
   const styles = {
     "Draft": "bg-gray-100 text-gray-600 border-gray-200",
     "Open": "bg-blue-100 text-blue-700 border-blue-200",
+    "OPEN": "bg-blue-100 text-blue-700 border-blue-200",
     "Closed": "bg-red-100 text-red-700 border-red-200",
+    "CLOSED": "bg-red-100 text-red-700 border-red-200",
     "Live": "bg-green-100 text-green-700 border-green-200",
-    "Completed": "bg-slate-700 text-white border-slate-800"
+    "LIVE": "bg-green-100 text-green-700 border-green-200",
+    "Completed": "bg-slate-700 text-white border-slate-800",
+    "COMPLETED": "bg-slate-700 text-white border-slate-800"
   };
   return (
     <span className={`text-xs font-bold px-3 py-1 rounded-md border uppercase tracking-wide ${styles[status] || styles["Draft"]}`}>
@@ -37,6 +43,7 @@ const ParticipantStatusBadge = ({ status }) => {
 const CoordinatorEventOperations = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const { showToast } = useToast();
 
   // State
   const [event, setEvent] = useState(null);
@@ -44,9 +51,10 @@ const CoordinatorEventOperations = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [loading, setLoading] = useState(true);
+  const [confirmConfig, setConfirmConfig] = useState({ show: false, action: null, title: "", message: "", type: "primary" });
 
   // Status map
-  const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed', draft: 'Draft', closed: 'Closed' };
+  const statusDisplayMap = { OPEN: 'Open', CLOSED: 'Closed', LIVE: 'Live', COMPLETED: 'Completed', draft: 'Draft' };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,42 +109,75 @@ const CoordinatorEventOperations = () => {
   // State Machine Logic
   const getNextStateAction = () => {
     switch (event.status) {
-      case "Draft": return { label: "Open Registration", nextState: "Open", color: "bg-blue-600 hover:bg-blue-700" };
-      case "Open": return { label: "Close Registration", nextState: "Closed", color: "bg-red-600 hover:bg-red-700" };
-      case "Closed": return { label: "Start Event", nextState: "Live", color: "bg-green-600 hover:bg-green-700" };
-      case "Live": return { label: "End Event", nextState: "Completed", color: "bg-gray-800 hover:bg-gray-900" };
-      case "Completed": return null;
+      case "Draft": return { label: "Open Registration", nextState: "OPEN", color: "bg-blue-600 hover:bg-blue-700" };
+      case "Open":
+      case "OPEN": return { label: "Close Registration", nextState: "CLOSED", color: "bg-red-600 hover:bg-red-700" };
+      case "Closed":
+      case "CLOSED": return { label: "Start Event", nextState: "LIVE", color: "bg-green-600 hover:bg-green-700" };
+      case "Live":
+      case "LIVE": return { label: "End Event", nextState: "COMPLETED", color: "bg-gray-800 hover:bg-gray-900" };
+      case "Completed":
+      case "COMPLETED": return null;
       default: return null;
     }
   };
 
   const action = getNextStateAction();
-  const isLive = event.status === "Live";
-  const isCompleted = event.status === "Completed";
+  const isLive = event.status === "Live" || event.status === "LIVE";
+  const isCompleted = event.status === "Completed" || event.status === "COMPLETED";
 
   const advanceState = async () => {
     if (action) {
-      if (action.nextState === "Live") {
-        if (!window.confirm("Are you sure you want to START the event? Attendance will be unlocked.")) return;
-        try {
-          await coordinatorService.startEvent(eventId);
-          setEvent(prev => ({ ...prev, status: "Live" }));
-          alert("Event started successfully!");
-        } catch (err) {
-          alert("Failed to start event.");
-        }
-      } else if (action.nextState === "Completed") {
-        if (!window.confirm("Are you sure you want to END the event? This action cannot be undone.")) return;
-        try {
-          await coordinatorService.endEvent(eventId);
-          setEvent(prev => ({ ...prev, status: "Completed" }));
-          alert("Event ended successfully!");
-          navigate(`/coordinator-results/${eventId}`);
-        } catch (err) {
-          alert("Failed to end event.");
-        }
+      if (action.nextState === "LIVE") {
+        setConfirmConfig({
+          show: true,
+          title: "Start Event?",
+          message: "Are you sure you want to START the event? Attendance will be unlocked.",
+          type: "primary",
+          action: async () => {
+            try {
+              await coordinatorService.startEvent(eventId);
+              setEvent(prev => ({ ...prev, status: "Live" }));
+              showToast("Event started successfully!");
+            } catch (err) {
+              showToast("Failed to start event.", "error");
+            }
+          }
+        });
+      } else if (action.nextState === "COMPLETED") {
+        setConfirmConfig({
+          show: true,
+          title: "End Event?",
+          message: "Are you sure you want to END the event? This action cannot be undone.",
+          type: "warning",
+          action: async () => {
+            try {
+              await coordinatorService.endEvent(eventId);
+              setEvent(prev => ({ ...prev, status: "COMPLETED" }));
+              showToast("Event ended successfully!");
+              navigate(`/coordinator-results/${eventId}`);
+            } catch (err) {
+              showToast("Failed to end event.", "error");
+            }
+          }
+        });
+      } else if (action.nextState === "CLOSED") {
+        setConfirmConfig({
+          show: true,
+          title: "Close Registration?",
+          message: "Are you sure you want to CLOSE registration? No new participants can join.",
+          type: "warning",
+          action: async () => {
+            try {
+              await coordinatorService.endRegistration(eventId);
+              setEvent(prev => ({ ...prev, status: "CLOSED" }));
+              showToast("Registration closed!");
+            } catch (err) {
+              showToast("Failed to close registration.", "error");
+            }
+          }
+        });
       } else {
-        // Just UI update for other states for now, backend might not have draft/open transitions
         setEvent(prev => ({ ...prev, status: action.nextState }));
       }
     }
@@ -150,7 +191,7 @@ const CoordinatorEventOperations = () => {
       await coordinatorService.markAttendance(eventId, [id]);
       setParticipants(prev => prev.map(p => p.id === id ? { ...p, attendance: value } : p));
     } catch (err) {
-      alert("Failed to mark attendance.");
+      showToast("Failed to mark attendance.", "error");
     }
   };
 
@@ -160,19 +201,31 @@ const CoordinatorEventOperations = () => {
       const confirmedIds = participants.filter(p => p.status === "Confirmed").map(p => p.id);
       if (confirmedIds.length === 0) return;
       
+      // Since our API currently accepts userIds, we pass them all
+      // The backend actually sets attendance to true for all passed IDs in the current implementation
+      // To strictly support 'absent' we'd need an API change, but for now this visually updates it
       if (value === 'present') {
-        // Assume backend only marks present or doesn't support bulk absent
         await coordinatorService.markAttendance(eventId, confirmedIds);
       }
-      
-      setParticipants(prev => prev.map(p => {
-        if (p.status === "Confirmed") {
-          return { ...p, attendance: value };
-        }
-        return p;
-      }));
+      setParticipants(prev => prev.map(p => p.status === "Confirmed" ? { ...p, attendance: value } : p));
     } catch (err) {
-      alert("Failed to bulk mark attendance.");
+      showToast("Failed to mark attendance.", "error");
+    }
+  };
+
+  const handleDownload = async (format) => {
+    try {
+      const blob = await coordinatorService.exportParticipationList(eventId, format);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `participants-${eventId}.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      showToast(`Downloaded ${format.toUpperCase()} list`);
+    } catch (err) {
+      showToast("Failed to download list", "error");
     }
   };
 
@@ -263,11 +316,19 @@ const CoordinatorEventOperations = () => {
                 {action.label} →
               </button>
             ) : (
-              <div className="w-full md:w-48 py-2.5 bg-gray-200 text-gray-500 font-bold rounded-lg text-center shadow-inner cursor-not-allowed">
-                Event Ended
+              <div className="flex flex-col gap-2 w-full md:w-48">
+                <div className="w-full py-2.5 bg-gray-200 text-gray-500 font-bold rounded-lg text-center shadow-inner cursor-not-allowed">
+                  Event Ended
+                </div>
+                <button 
+                  onClick={() => navigate(`/coordinator-results/${eventId}`)}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm transition-all"
+                >
+                  Manage Results 🏆
+                </button>
               </div>
             )}
-            {!isLive && event.status !== "Completed" && (
+            {!isLive && event.status !== "Completed" && event.status !== "COMPLETED" && (
               <p className="text-[10px] text-gray-400 mt-2 text-center w-full">Attendance locked until event is Live</p>
             )}
           </div>
@@ -284,7 +345,23 @@ const CoordinatorEventOperations = () => {
                 <p className="text-xs text-gray-500 mt-0.5">Manage attendees and track presence.</p>
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 justify-end">
+                {event.status === "Closed" || event.status === "CLOSED" ? (
+                  <div className="flex gap-2 border-r border-gray-200 pr-2 mr-1">
+                    <button 
+                      onClick={() => handleDownload('csv')}
+                      className="px-3 py-1.5 text-xs font-bold rounded-md transition-colors border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    >
+                      Export CSV
+                    </button>
+                    <button 
+                      onClick={() => handleDownload('pdf')}
+                      className="px-3 py-1.5 text-xs font-bold rounded-md transition-colors border bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                    >
+                      Export PDF
+                    </button>
+                  </div>
+                ) : null}
                 <button 
                   onClick={() => bulkMarkAttendance('present')}
                   disabled={!isLive}
@@ -374,8 +451,19 @@ const CoordinatorEventOperations = () => {
         </div>
 
       </main>
+      <ConfirmationModal
+        isOpen={confirmConfig.show}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={() => {
+          confirmConfig.action();
+          setConfirmConfig({ ...confirmConfig, show: false });
+        }}
+        onCancel={() => setConfirmConfig({ ...confirmConfig, show: false })}
+      />
     </div>
   );
-};
+}
 
 export default CoordinatorEventOperations;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import * as coordinatorService from "../services/coordinatorService";
+import { useToast } from "../context/ToastContext";
 
 
 
@@ -21,10 +22,14 @@ const StatCard = ({ label, value, icon }) => (
 const EventCard = ({ event, navigate }) => {
   const getBadgeStyle = (status) => {
     switch (status) {
+      case "LIVE":
       case "Live": return "bg-green-100 text-green-700 border-green-200";
+      case "OPEN": 
       case "Open": 
       case "Upcoming": return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "CLOSED":
       case "Closed": return "bg-red-100 text-red-700 border-red-200";
+      case "COMPLETED":
       case "Completed": return "bg-gray-100 text-gray-600 border-gray-200";
       case "Not Configured": return "bg-orange-100 text-orange-700 border-orange-200";
       default: return "bg-gray-100 text-gray-600";
@@ -51,8 +56,8 @@ const EventCard = ({ event, navigate }) => {
         <button onClick={() => navigate("/coordinator-management")} className="flex-1 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg transition-colors border border-gray-200">
           Configure
         </button>
-        <button onClick={() => navigate(event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold text-xs rounded-lg transition-colors">
-          {event.status === "Completed" ? "View Results" : "View Participants"}
+        <button onClick={() => navigate(event.status === "COMPLETED" || event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold text-xs rounded-lg transition-colors">
+          {event.status === "COMPLETED" || event.status === "Completed" ? "View Results" : "View Participants"}
         </button>
       </div>
     </div>
@@ -67,11 +72,12 @@ const NotificationItem = ({ notif }) => (
 );
 
 // --- Main Page ---
-const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed' };
+const statusDisplayMap = { OPEN: 'Open', CLOSED: 'Closed', LIVE: 'Live', COMPLETED: 'Completed' };
 
 const CoordinatorDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,9 +97,9 @@ const CoordinatorDashboard = () => {
 
   const mockStats = [
     { id: 1, label: "Total Assigned", value: events.length, icon: "📋" },
-    { id: 2, label: "Active Events", value: events.filter(e => e.status === 'ongoing').length, icon: "🔥" },
-    { id: 3, label: "Upcoming Events", value: events.filter(e => e.status === 'upcoming').length, icon: "📅" },
-    { id: 4, label: "Completed", value: events.filter(e => e.status === 'completed').length, icon: "✅" },
+    { id: 2, label: "Active Events", value: events.filter(e => e.status === 'LIVE').length, icon: "🔥" },
+    { id: 3, label: "Upcoming Events", value: events.filter(e => e.status === 'OPEN').length, icon: "📅" },
+    { id: 4, label: "Completed", value: events.filter(e => e.status === 'COMPLETED').length, icon: "✅" },
     { id: 5, label: "Total Participants", value: events.reduce((s, e) => s + (e.participants?.length || 0), 0), icon: "👥" },
   ];
 
@@ -152,7 +158,7 @@ const CoordinatorDashboard = () => {
             <p className="text-sm text-gray-500 mt-1">Manage your assigned events and review participant data.</p>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <button onClick={() => alert("Refreshing data...")} className="flex-1 sm:flex-none px-4 py-2 bg-white text-gray-700 text-xs sm:text-sm font-semibold border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
+            <button onClick={() => showToast("Refreshing data...")} className="flex-1 sm:flex-none px-4 py-2 bg-white text-gray-700 text-xs sm:text-sm font-semibold border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
               ↻ Refresh Data
             </button>
             <button onClick={() => navigate("/coordinator-events")} className="flex-1 sm:flex-none px-4 py-2 bg-gray-800 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-900 transition-colors">

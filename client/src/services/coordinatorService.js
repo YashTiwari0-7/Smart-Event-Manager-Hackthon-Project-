@@ -25,6 +25,11 @@ export const getEventParticipants = async (id) => {
     return data;
 };
 
+export const getEventTeams = async (id) => {
+    const { data } = await api.get(`/coordinator/event/${id}/teams`);
+    return data;
+};
+
 export const endRegistration = async (id) => {
     const { data } = await api.post(`/coordinator/event/${id}/end-registration`);
     return data;
@@ -60,8 +65,8 @@ export const generateCertificates = async (id) => {
     return data;
 };
 
-export const exportParticipationList = async (id) => {
-    const response = await api.get(`/coordinator/event/${id}/export`, {
+export const exportParticipationList = async (id, format = 'csv') => {
+    const response = await api.get(`/coordinator/event/${id}/export?format=${format}`, {
         responseType: 'blob'
     });
     return response.data;

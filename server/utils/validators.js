@@ -28,6 +28,10 @@ const assertObjectIdList = (ids = [], message = 'Invalid id') => {
 };
 
 const isRegistrationOpen = (event, date = new Date()) => {
+    if (event.status !== 'OPEN') {
+        return false;
+    }
+
     if (event.registrationStartDate && date < new Date(event.registrationStartDate)) {
         return false;
     }

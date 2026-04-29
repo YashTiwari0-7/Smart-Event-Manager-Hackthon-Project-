@@ -18,13 +18,17 @@ const ADMIN_EVENT_FIELDS = [
 ];
 
 const COORDINATOR_CONFIG_FIELDS = [
+    'description',
     'participationType',
     'maxTeamSize',
+    'minTeamSize',
+    'totalTeams',
     'totalSlots',
     'genderSpecification',
     'registrationStartDate',
     'registrationEndDate',
-    'eventDate'
+    'eventDate',
+    'volunteers'
 ];
 
 const ensureAllowedFields = (data, allowedFields, message) => {
@@ -88,7 +92,10 @@ const populateEvent = (query) => {
         .populate('winners', 'name email gender')
         .populate('results.winner', 'name email gender')
         .populate('results.runnerUp', 'name email gender')
-        .populate('results.top3', 'name email gender');
+        .populate('results.top3', 'name email gender')
+        .populate('results.winnerTeam', 'name')
+        .populate('results.runnerUpTeam', 'name')
+        .populate('results.top3Teams', 'name');
 };
 
 const createEvent = async (data, adminId) => {
@@ -271,8 +278,20 @@ const getAssignedEventById = async (eventId, coordinatorId) => {
     await event.populate('results.winner', 'name email gender');
     await event.populate('results.runnerUp', 'name email gender');
     await event.populate('results.top3', 'name email gender');
+    await event.populate('results.winnerTeam', 'name');
+    await event.populate('results.runnerUpTeam', 'name');
+    await event.populate('results.top3Teams', 'name');
 
     return event;
+};
+
+const getEventTeams = async (eventId, coordinatorId) => {
+    await getAssignedEvent(eventId, coordinatorId);
+
+    return Team.find({ event: eventId })
+        .populate('leader', 'name email')
+        .populate('members', 'name email')
+        .sort({ createdAt: -1 });
 };
 
 const configureAssignedEvent = async (eventId, coordinatorId, data) => {
@@ -366,13 +385,19 @@ const configureAssignedEvent = async (eventId, coordinatorId, data) => {
         }
     }
 
+    event.description = hasOwn(data, 'description') ? data.description : event.description;
     event.participationType = nextConfig.participationType;
     event.maxTeamSize = nextConfig.maxTeamSize;
+    event.minTeamSize = hasOwn(data, 'minTeamSize') ? Number(data.minTeamSize) || 0 : event.minTeamSize;
+    event.totalTeams  = hasOwn(data, 'totalTeams')  ? Number(data.totalTeams)  || 0 : event.totalTeams;
     event.totalSlots = nextConfig.totalSlots;
     event.genderSpecification = nextConfig.genderSpecification;
     event.registrationStartDate = nextConfig.registrationStartDate;
     event.registrationEndDate = nextConfig.registrationEndDate;
     event.eventDate = nextConfig.eventDate;
+    if (hasOwn(data, 'volunteers') && Array.isArray(data.volunteers)) {
+        event.volunteers = data.volunteers;
+    }
     event.configOwner = event.configOwner || coordinatorId;
 
     return event.save();
@@ -511,7 +536,7 @@ const getAdminStats = async () => {
     ]);
 
     const totalEvents = events.length;
-    const upcomingEvents = events.filter(e => e.status === 'open').length;
+    const upcomingEvents = events.filter(e => e.status === 'OPEN').length;
     const totalParticipation = registrations.length;
     const avgParticipation = totalEvents > 0 ? Math.round(totalParticipation / totalEvents) : 0;
 
@@ -534,6 +559,7 @@ module.exports = {
     getAssignedEventById,
     configureAssignedEvent,
     getEventParticipants,
+    getEventTeams,
     validateApprovedCoordinators,
     getEventParticipantsForAdmin,
     createCoordinatorByAdmin,

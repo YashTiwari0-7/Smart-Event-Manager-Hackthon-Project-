@@ -132,34 +132,16 @@ const getAvailableSlots = async (event) => {
 };
 
 const getAvailableEvents = async (userId) => {
-    const now = new Date();
     let events = await Event.find({
-        status: 'upcoming',
-        participationType: { $in: ['individual', 'team'] },
-        registrationStartDate: { $lte: now },
-        registrationEndDate: { $gte: now }
+        participationType: { $in: ['individual', 'team'] }
     })
-        .select('title description participationType totalSlots maxTeamSize genderSpecification registrationStartDate registrationEndDate eventDate')
+        .select('title description participationType totalSlots maxTeamSize genderSpecification registrationStartDate registrationEndDate eventDate status')
         .sort({ registrationStartDate: 1, createdAt: -1 });
-
-    if (userId) {
-        const registrations = await Registration.find({
-            user: userId,
-            status: 'registered'
-        }).populate('event', 'eventDate');
-        const occupiedTimes = new Set(registrations
-            .filter((registration) => registration.event?.eventDate)
-            .map((registration) => new Date(registration.event.eventDate).getTime()));
-
-        events = events.filter((event) => {
-            return !event.eventDate || !occupiedTimes.has(new Date(event.eventDate).getTime());
-        });
-    }
 
     return Promise.all(events.map(async (event) => ({
         _id: event._id,
         title: event.title,
-        shortDescription: event.description,
+        description: event.description,
         participationType: event.participationType,
         totalSlots: event.totalSlots,
         maxTeamSize: event.maxTeamSize,
@@ -167,7 +149,8 @@ const getAvailableEvents = async (userId) => {
         genderSpecification: event.genderSpecification,
         registrationStartDate: event.registrationStartDate,
         registrationEndDate: event.registrationEndDate,
-        eventDate: event.eventDate
+        eventDate: event.eventDate,
+        status: event.status
     })));
 };
 
@@ -183,7 +166,7 @@ const getEventForRegistration = async (eventId) => {
     assertEventConfigured(event);
     assertRegistrationOpen(event);
 
-    if (event.status !== 'upcoming') {
+    if (event.status !== 'OPEN') {
         throw new AppError('Registration is not available for this event', 400);
     }
 
@@ -256,7 +239,8 @@ const registerForEvent = async ({ eventId, userId }) => {
 };
 
 const generateInvitationCode = () => {
-    return crypto.randomBytes(4).toString('hex').toUpperCase();
+    // Generate a 6-character alphanumeric code
+    return crypto.randomBytes(3).toString('hex').toUpperCase();
 };
 
 const createTeam = async ({ eventId, userId, teamName }) => {
@@ -383,10 +367,21 @@ const joinTeam = async ({ eventId, userId, invitationCode }) => {
 };
 
 const withdrawFromEvent = async ({ eventId, userId }) => {
-    const event = await getEventForRegistration(eventId);
+    assertObjectId(eventId, 'Invalid event id');
 
-    if (event.registrationEndDate && new Date(event.registrationEndDate) < new Date()) {
-        throw new AppError('Registration period has ended. Withdrawal is no longer allowed.', 400);
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+        throw new AppError('Event not found', 404);
+    }
+
+    if (!event.registrationStartDate || !event.registrationEndDate) {
+        throw new AppError('Event registration dates are not configured', 400);
+    }
+
+    const now = new Date();
+    if (now < new Date(event.registrationStartDate) || now > new Date(event.registrationEndDate)) {
+        throw new AppError('Withdrawal is only allowed between registration start and end dates', 400);
     }
 
     const registration = await Registration.findOne({
@@ -420,7 +415,7 @@ const getParticipationHistory = async (userId) => {
                 { path: 'results.top3', select: 'name email gender' }
             ]
         })
-        .populate('team', 'name invitationCode members')
+        .populate('team', 'name invitationCode members leader capacity isComplete')
         .sort({ createdAt: -1 });
 
     return registrations.filter((registration) => {
@@ -431,7 +426,7 @@ const getParticipationHistory = async (userId) => {
 const getParticipationStats = async (userId) => {
     const registrations = await Registration.find({ user: userId })
         .populate('event', 'title participationType registrationStartDate registrationEndDate eventDate')
-        .populate('team', 'name members')
+        .populate('team', 'name members leader invitationCode capacity isComplete')
         .sort({ createdAt: -1 });
 
     const certificates = await Certificate.find({ user: userId })
@@ -450,11 +445,137 @@ const getParticipationStats = async (userId) => {
     };
 };
 
+
+const leaveTeam = async ({ eventId, userId }) => {
+    assertObjectId(eventId, 'Invalid event id');
+
+    const event = await Event.findById(eventId);
+    if (!event) throw new AppError('Event not found', 404);
+
+    const now = new Date();
+    if (event.registrationEndDate && now > new Date(event.registrationEndDate)) {
+        throw new AppError('Cannot leave team: registration period has ended', 400);
+    }
+
+    const team = await Team.findOne({ event: eventId, members: userId });
+    if (!team) throw new AppError('You are not in a team for this event', 404);
+
+    if (String(team.leader) === String(userId)) {
+        // Leader cancels whole team
+        team.members.forEach(memberId => event.participants.pull(memberId));
+        await Registration.updateMany(
+            { event: eventId, team: team._id },
+            { status: 'withdrawn', team: null }
+        );
+        event.teams.pull(team._id);
+        await event.save();
+        await team.deleteOne();
+        return { message: 'Team cancelled' };
+    }
+
+    team.members.pull(userId);
+    team.isComplete = false;
+    await team.save();
+
+    await Registration.findOneAndUpdate(
+        { user: userId, event: eventId },
+        { status: 'withdrawn', team: null }
+    );
+    event.participants.pull(userId);
+    await event.save();
+
+    return { message: 'Left team successfully' };
+};
+
+const removeTeamMember = async ({ eventId, leaderId, memberId }) => {
+    assertObjectId(eventId, 'Invalid event id');
+    assertObjectId(leaderId, 'Invalid leader id');
+    assertObjectId(memberId, 'Invalid member id');
+
+    if (String(leaderId) === String(memberId)) {
+        throw new AppError('Leader cannot remove themselves using this endpoint. Use leave team instead.', 400);
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) throw new AppError('Event not found', 404);
+
+    const now = new Date();
+    if (event.registrationEndDate && now > new Date(event.registrationEndDate)) {
+        throw new AppError('Cannot remove member: registration period has ended', 400);
+    }
+
+    const team = await Team.findOne({ event: eventId, leader: leaderId });
+    if (!team) throw new AppError('You are not the leader of a team for this event', 403);
+
+    if (!team.members.includes(memberId)) {
+        throw new AppError('User is not a member of your team', 404);
+    }
+
+    team.members.pull(memberId);
+    if (team.isComplete) {
+        team.isComplete = false;
+        // Revert all existing members to 'registered' but they are still in a team that is not complete
+        // Actually, if a team becomes incomplete, do we revoke their registration? 
+        // The requirements say: "Application Status: Pending (team incomplete)".
+        // So we just update the team's isComplete flag. The registrations are still technically 'registered' but the UI will see isComplete=false as Pending.
+    }
+    await team.save();
+
+    await Registration.findOneAndUpdate(
+        { user: memberId, event: eventId },
+        { status: 'withdrawn', team: null }
+    );
+    event.participants.pull(memberId);
+    await event.save();
+
+    return team.populate('members', 'name email gender');
+};
+
+const updateTeamName = async ({ eventId, leaderId, teamName }) => {
+    assertObjectId(eventId, 'Invalid event id');
+    assertObjectId(leaderId, 'Invalid leader id');
+
+    if (!teamName || String(teamName).trim() === '') {
+        throw new AppError('Team name is required', 400);
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) throw new AppError('Event not found', 404);
+
+    const team = await Team.findOne({ event: eventId, leader: leaderId });
+    if (!team) throw new AppError('You are not the leader of a team for this event', 403);
+
+    if (!team.isComplete) {
+        throw new AppError('Team name can only be officially set when all slots are filled', 400);
+    }
+
+    const normalizedTeamName = String(teamName).trim();
+    
+    // Check if name is taken by another team
+    const existingTeam = await Team.findOne({
+        event: event._id,
+        name: normalizedTeamName,
+        _id: { $ne: team._id }
+    }).select('_id');
+
+    if (existingTeam) {
+        throw new AppError('Team name already exists for this event', 400);
+    }
+
+    team.name = normalizedTeamName;
+    await team.save();
+
+    return team.populate('members', 'name email gender');
+};
+
 module.exports = {
     getAvailableEvents,
     registerForEvent,
     createTeam,
     joinTeam,
+    leaveTeam,
+    removeTeamMember,
+    updateTeamName,
     withdrawFromEvent,
     getParticipationHistory,
     getParticipationStats,

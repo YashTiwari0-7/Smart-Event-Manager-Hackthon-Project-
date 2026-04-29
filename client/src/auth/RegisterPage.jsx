@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { registerParticipant, verifyParticipantOtp } from "../services/authService";
+import { registerParticipant, verifyParticipantOtp, registerCoordinator, verifyCoordinatorOtp } from "../services/authService";
+import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 
 /* ── Input Field helper ─────────────────────────────────────── */
-const InputField = ({ label, type = "text", placeholder, required = true, value, onChange, disabled, children, name }) => (
+const InputField = ({ label, type = "text", placeholder, required = true, value, onChange, disabled, children, name, pattern, maxLength, minLength }) => (
   <div>
     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}</label>
     {children || (
@@ -15,6 +17,9 @@ const InputField = ({ label, type = "text", placeholder, required = true, value,
         onChange={onChange}
         disabled={disabled}
         name={name}
+        pattern={pattern}
+        maxLength={maxLength}
+        minLength={minLength}
         className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm placeholder:text-slate-400 disabled:opacity-50"
       />
     )}
@@ -23,12 +28,13 @@ const InputField = ({ label, type = "text", placeholder, required = true, value,
 
 /* ── Participant Register Form ──────────────────────────────── */
 const ParticipantForm = ({ onSuccess }) => {
-  const [step, setStep] = useState(1);
-  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState("");
+  
+  const { showToast } = useToast();
+  const { loginSuccess } = useAuth();
+  const navigate = useNavigate();
 
   // Form data
   const [formData, setFormData] = useState({
@@ -40,29 +46,18 @@ const ParticipantForm = ({ onSuccess }) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const pgCourses = ["MCA", "MBA", "MCom"];
-  const isPG = pgCourses.includes(formData.course);
-  const maxSem = isPG ? 4 : 6;
-
-  const handleStep1Submit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setStep(2);
-  };
-
-  const handleStep2Submit = async (e) => {
-    e.preventDefault();
-    if (!agreed) return alert("Please agree to the Terms.");
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      showToast("Passwords do not match", "error");
       return;
     }
     if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
+      showToast("Password must be at least 6 characters", "error");
       return;
     }
 
     setLoading(true);
-    setError("");
     try {
       await registerParticipant({
         name: formData.name,
@@ -75,8 +70,9 @@ const ParticipantForm = ({ onSuccess }) => {
         password: formData.password
       });
       setOtpStep(true);
+      showToast("OTP sent to your email!");
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      showToast(err.response?.data?.message || "Registration failed", "error");
     } finally {
       setLoading(false);
     }
@@ -85,12 +81,13 @@ const ParticipantForm = ({ onSuccess }) => {
   const handleOtpVerify = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
     try {
-      await verifyParticipantOtp(formData.email, otp);
-      onSuccess();
+      const userObj = await verifyParticipantOtp(formData.email, otp);
+      showToast("Account created successfully!");
+      loginSuccess(userObj);
+      navigate("/participant-dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "OTP verification failed");
+      showToast(err.response?.data?.message || "OTP verification failed", "error");
     } finally {
       setLoading(false);
     }
@@ -104,7 +101,6 @@ const ParticipantForm = ({ onSuccess }) => {
           <h3 className="text-lg font-bold text-slate-900">Verify Your Email</h3>
           <p className="text-sm text-slate-500 mt-1">We sent a 6-digit OTP to <span className="font-semibold text-slate-700">{formData.email}</span></p>
         </div>
-        {error && <div className="p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">{error}</div>}
         <InputField label="Enter OTP" type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)} disabled={loading} />
         <button type="submit" disabled={loading} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 flex items-center justify-center gap-2">
           {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Verifying...</> : "Verify & Create Account 🎉"}
@@ -114,89 +110,59 @@ const ParticipantForm = ({ onSuccess }) => {
   }
 
   return (
-    <>
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className={`flex items-center gap-1.5 text-xs font-semibold ${step >= 1 ? "text-primary-600" : "text-slate-400"}`}>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${step >= 1 ? "bg-primary-600" : "bg-slate-200"}`}>1</div>
-          Personal Info
-        </div>
-        <div className={`flex-1 h-0.5 rounded ${step >= 2 ? "bg-primary-400" : "bg-slate-200"}`}></div>
-        <div className={`flex items-center gap-1.5 text-xs font-semibold ${step >= 2 ? "text-primary-600" : "text-slate-400"}`}>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${step >= 2 ? "bg-primary-600" : "bg-slate-200"}`}>2</div>
-          Account Setup
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InputField label="Full Name" placeholder="John Doe" value={formData.name} onChange={handleChange} name="name" />
+        <InputField label="Email Address" type="email" placeholder="john@college.edu" value={formData.email} onChange={handleChange} name="email" />
+        <InputField label="Phone Number" type="tel" placeholder="10-digit number" value={formData.mobileNumber} onChange={handleChange} name="mobileNumber" pattern="[0-9]{10}" maxLength={10} minLength={10} />
+        <InputField label="College / University" placeholder="e.g. IIT Delhi" value={formData.institution} onChange={handleChange} name="institution" />
+        
+        <InputField label="Age" type="number" placeholder="e.g. 20" value={formData.age} onChange={handleChange} name="age" />
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Gender</label>
+          <select required value={formData.gender} onChange={handleChange} name="gender"
+            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm text-slate-700">
+            <option value="">Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
         </div>
       </div>
 
-      {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">{error}</div>}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Course</label>
+        <select required value={formData.course} onChange={handleChange} name="course"
+          className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm text-slate-700">
+          <option value="">Select Course</option>
+          <option value="BCA">BCA</option>
+          <option value="BBA">BBA</option>
+          <option value="BCom">BCom</option>
+          <option value="MCA">MCA</option>
+          <option value="MBA">MBA</option>
+          <option value="MCom">MCom</option>
+        </select>
+      </div>
 
-      {step === 1 ? (
-        <form onSubmit={handleStep1Submit} className="space-y-4">
-          <InputField label="Full Name" placeholder="John Doe" value={formData.name} onChange={handleChange} name="name" />
-          <InputField label="Email Address" type="email" placeholder="john@college.edu" value={formData.email} onChange={handleChange} name="email" />
-          <InputField label="Phone Number" type="tel" placeholder="+91 98765 43210" value={formData.mobileNumber} onChange={handleChange} name="mobileNumber" />
-          <InputField label="College / University" placeholder="e.g. IIT Delhi" value={formData.institution} onChange={handleChange} name="institution" />
-          <InputField label="Age" type="number" placeholder="e.g. 20" value={formData.age} onChange={handleChange} name="age" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InputField label="Password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} name="password" disabled={loading} />
+        <InputField label="Confirm Password" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" disabled={loading} />
+      </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Gender</label>
-            <select required value={formData.gender} onChange={handleChange} name="gender"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm text-slate-700">
-              <option value="">Select Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Course</label>
-            <select required value={formData.course} onChange={handleChange} name="course"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm text-slate-700">
-              <option value="">Select Course</option>
-              <option value="BCA">BCA</option>
-              <option value="BBA">BBA</option>
-              <option value="BCom">BCom</option>
-              <option value="MCA">MCA</option>
-              <option value="MBA">MBA</option>
-              <option value="MCom">MCom</option>
-            </select>
-          </div>
-
-          <button type="submit" className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition-all shadow-md hover:shadow-lg text-sm">
-            Continue →
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={handleStep2Submit} className="space-y-4">
-          <InputField label="Password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} name="password" disabled={loading} />
-          <InputField label="Confirm Password" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" disabled={loading} />
-          <div className="flex items-start gap-3">
-            <input id="terms-p" type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-primary-600 cursor-pointer" />
-            <label htmlFor="terms-p" className="text-sm text-slate-500 leading-relaxed cursor-pointer">
-              I agree to the <span className="text-primary-600 font-semibold">Terms of Service</span> and <span className="text-primary-600 font-semibold">Privacy Policy</span>.
-            </label>
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setStep(1)} disabled={loading} className="flex-1 border border-slate-200 text-slate-600 font-semibold py-3 rounded-xl hover:bg-slate-50 transition-all text-sm">← Back</button>
-            <button type="submit" disabled={loading} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending OTP...</> : "Register →"}
-            </button>
-          </div>
-        </form>
-      )}
-    </>
+      <button type="submit" disabled={loading} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 mt-4 flex items-center justify-center gap-2">
+        {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending OTP...</> : "Register & Verify Email →"}
+      </button>
+    </form>
   );
 };
 
 /* ── Coordinator Register Form ──────────────────────────────── */
 const CoordinatorForm = ({ onSuccess }) => {
-  const [step, setStep] = useState(1);
-  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState("");
+
+  const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
     name: "", email: "", phoneNumber: "", institutionName: "",
@@ -207,25 +173,18 @@ const CoordinatorForm = ({ onSuccess }) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleStep1Submit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setStep(2);
-  };
-
-  const handleStep2Submit = async (e) => {
-    e.preventDefault();
-    if (!agreed) return alert("Please agree to the Terms.");
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      showToast("Passwords do not match", "error");
       return;
     }
     if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
+      showToast("Password must be at least 6 characters", "error");
       return;
     }
 
     setLoading(true);
-    setError("");
     try {
       await registerCoordinator({
         name: formData.name,
@@ -238,8 +197,9 @@ const CoordinatorForm = ({ onSuccess }) => {
         password: formData.password
       });
       setOtpStep(true);
+      showToast("OTP sent to your email!");
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      showToast(err.response?.data?.message || "Registration failed", "error");
     } finally {
       setLoading(false);
     }
@@ -248,12 +208,11 @@ const CoordinatorForm = ({ onSuccess }) => {
   const handleOtpVerify = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
     try {
       await verifyCoordinatorOtp(formData.email, otp);
       onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || "OTP verification failed");
+      showToast(err.response?.data?.message || "OTP verification failed", "error");
     } finally {
       setLoading(false);
     }
@@ -267,7 +226,6 @@ const CoordinatorForm = ({ onSuccess }) => {
           <h3 className="text-lg font-bold text-slate-900">Verify Your Email</h3>
           <p className="text-sm text-slate-500 mt-1">We sent a 6-digit OTP to <span className="font-semibold text-slate-700">{formData.email}</span></p>
         </div>
-        {error && <div className="p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">{error}</div>}
         <InputField label="Enter OTP" type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)} disabled={loading} />
         <button type="submit" disabled={loading} className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 flex items-center justify-center gap-2">
           {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Verifying...</> : "Verify & Create Account 🎉"}
@@ -277,65 +235,38 @@ const CoordinatorForm = ({ onSuccess }) => {
   }
 
   return (
-    <>
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className={`flex items-center gap-1.5 text-xs font-semibold ${step >= 1 ? "text-violet-600" : "text-slate-400"}`}>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${step >= 1 ? "bg-violet-600" : "bg-slate-200"}`}>1</div>
-          Professional Info
-        </div>
-        <div className={`flex-1 h-0.5 rounded ${step >= 2 ? "bg-violet-400" : "bg-slate-200"}`}></div>
-        <div className={`flex items-center gap-1.5 text-xs font-semibold ${step >= 2 ? "text-violet-600" : "text-slate-400"}`}>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${step >= 2 ? "bg-violet-600" : "bg-slate-200"}`}>2</div>
-          Account Setup
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InputField label="Full Name" placeholder="Rahul Verma" value={formData.name} onChange={handleChange} name="name" />
+        <InputField label="Email Address" type="email" placeholder="coordinator@college.edu" value={formData.email} onChange={handleChange} name="email" />
+        <InputField label="Phone Number" type="tel" placeholder="10-digit number" value={formData.phoneNumber} onChange={handleChange} name="phoneNumber" pattern="[0-9]{10}" maxLength={10} minLength={10} />
+        <InputField label="Organization / College" placeholder="e.g. BITS Pilani" value={formData.institutionName} onChange={handleChange} name="institutionName" />
+        <InputField label="Designation / Event Role" placeholder="e.g. Fest Convener" value={formData.designation} onChange={handleChange} name="designation" />
+        
+        <div className="grid grid-cols-2 gap-4">
+          <InputField label="Age" type="number" placeholder="25" value={formData.age} onChange={handleChange} name="age" />
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Gender</label>
+            <select required value={formData.gender} onChange={handleChange} name="gender"
+              className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all text-sm text-slate-700">
+              <option value="">Select</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">{error}</div>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+        <InputField label="Password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} name="password" disabled={loading} />
+        <InputField label="Confirm Password" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" disabled={loading} />
+      </div>
 
-      {step === 1 ? (
-        <form onSubmit={handleStep1Submit} className="space-y-4">
-          <InputField label="Full Name" placeholder="Rahul Verma" value={formData.name} onChange={handleChange} name="name" />
-          <InputField label="Email Address" type="email" placeholder="coordinator@college.edu" value={formData.email} onChange={handleChange} name="email" />
-          <InputField label="Phone Number" type="tel" placeholder="+91 98765 43210" value={formData.phoneNumber} onChange={handleChange} name="phoneNumber" />
-          <InputField label="Organization / College" placeholder="e.g. BITS Pilani" value={formData.institutionName} onChange={handleChange} name="institutionName" />
-          <InputField label="Designation / Event Role" placeholder="e.g. Fest Convener" value={formData.designation} onChange={handleChange} name="designation" />
-          <div className="grid grid-cols-2 gap-4">
-            <InputField label="Age" type="number" placeholder="25" value={formData.age} onChange={handleChange} name="age" />
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Gender</label>
-              <select required value={formData.gender} onChange={handleChange} name="gender"
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all text-sm text-slate-700">
-                <option value="">Select</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm">
-            Continue →
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={handleStep2Submit} className="space-y-4">
-          <InputField label="Password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} name="password" disabled={loading} />
-          <InputField label="Confirm Password" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" disabled={loading} />
-          <div className="flex items-start gap-3">
-            <input id="terms-c" type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-violet-600 cursor-pointer" />
-            <label htmlFor="terms-c" className="text-sm text-slate-500 leading-relaxed cursor-pointer">
-              I agree to the <span className="text-violet-600 font-semibold">Terms of Service</span> and <span className="text-violet-600 font-semibold">Privacy Policy</span>.
-            </label>
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setStep(1)} disabled={loading} className="flex-1 border border-slate-200 text-slate-600 font-semibold py-3 rounded-xl hover:bg-slate-50 transition-all text-sm">← Back</button>
-            <button type="submit" disabled={loading} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending OTP...</> : "Register →"}
-            </button>
-          </div>
-        </form>
-      )}
-    </>
+      <button type="submit" disabled={loading} className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm disabled:opacity-60 mt-4 flex items-center justify-center gap-2">
+        {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending OTP...</> : "Register & Verify Email →"}
+      </button>
+    </form>
   );
 };
 
@@ -381,10 +312,7 @@ const RegisterPage = () => {
       {/* Top bar */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors">
-            ← Back
-          </button>
-          <Link to="/" className="flex items-center gap-2 border-l border-slate-200 pl-4">
+          <Link to="/" className="flex items-center gap-2 border-slate-200 pl-4">
             <span className="text-xl font-bold text-primary-600">⚡</span>
             <span className="text-lg font-bold text-slate-900 tracking-tight">
               Smart<span className="text-primary-600">Event</span>
@@ -413,7 +341,7 @@ const RegisterPage = () => {
           </p>
 
           {/* Form */}
-          <ParticipantForm onSuccess={() => setSubmitted(true)} />
+          {isCoordinator ? <CoordinatorForm onSuccess={() => setSubmitted(true)} /> : <ParticipantForm onSuccess={() => setSubmitted(true)} />}
 
           {/* Login hint */}
           <p className="text-center text-xs text-slate-400 mt-6">

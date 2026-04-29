@@ -26,6 +26,12 @@ const getEventParticipants = asyncHandler(async (req, res) => {
     res.json(participants);
 });
 
+const getEventTeams = asyncHandler(async (req, res) => {
+    const teams = await eventService.getEventTeams(req.params.id, req.user._id);
+
+    res.json(teams);
+});
+
 const endRegistration = asyncHandler(async (req, res) => {
     const result = await coordinatorService.endRegistration({
         eventId: req.params.id,
@@ -94,7 +100,19 @@ const generateCertificates = asyncHandler(async (req, res) => {
 });
 
 const exportParticipationList = asyncHandler(async (req, res) => {
-    const csv = await coordinatorService.exportParticipationList({
+    const format = req.query.format || 'csv';
+    
+    if (format === 'pdf') {
+        const pdfBuffer = await coordinatorService.exportParticipationListPDF({
+            eventId: req.params.id,
+            coordinatorId: req.user._id
+        });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="event-${req.params.id}-participants.pdf"`);
+        return res.send(pdfBuffer);
+    }
+
+    const csv = await coordinatorService.exportParticipationListCSV({
         eventId: req.params.id,
         coordinatorId: req.user._id
     });
@@ -115,6 +133,7 @@ module.exports = {
     getAssignedEventById,
     configureEventSettings,
     getEventParticipants,
+    getEventTeams,
     endRegistration,
     startEvent,
     getAttendance,

@@ -28,8 +28,8 @@ const eventSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['open', 'closed', 'live', 'completed'],
-            default: 'open'
+            enum: ['OPEN', 'CLOSED', 'LIVE', 'COMPLETED'],
+            default: 'OPEN'
         },
 
         participationType: {
@@ -124,6 +124,22 @@ const eventSchema = new mongoose.Schema(
                 {
                     type: mongoose.Schema.Types.ObjectId,
                     ref: 'User'
+                }
+            ],
+            winnerTeam: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Team',
+                default: null
+            },
+            runnerUpTeam: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Team',
+                default: null
+            },
+            top3Teams: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Team'
                 }
             ]
         },

@@ -1,44 +1,29 @@
 import React, { useState, useEffect } from "react";
 import * as adminService from "../services/adminService";
+import { useToast } from "../context/ToastContext";
 
-const btn = (bg, color) => ({
-  background: bg, color, border: "none", borderRadius: 10, padding: "10px 20px",
-  fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "opacity 0.15s",
-});
-const input = {
-  width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb",
-  fontSize: 13, outline: "none", boxSizing: "border-box",
-};
-const label = { fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" };
-
-const Modal = ({ open, onClose, title, children, width = 520 }) => {
+/* ─── Modal ─── */
+const Modal = ({ open, onClose, title, children, wide }) => {
   if (!open) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)" }} />
-      <div style={{
-        position: "relative", background: "#fff", borderRadius: 16, width, maxWidth: "90vw", maxHeight: "85vh",
-        overflow: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.2)",
-      }} onClick={e => e.stopPropagation()}>
-        <div style={{
-          padding: "20px 24px", borderBottom: "1px solid #e5e7eb",
-          display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#fff", zIndex: 2,
-        }}>
-          <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: "#111827" }}>{title}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>✕</button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+      <div className={`relative bg-white rounded-2xl ${wide ? "w-[580px]" : "w-[520px]"} max-w-[90vw] max-h-[85vh] overflow-auto shadow-2xl`} onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h2 className="text-base font-extrabold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="text-xl text-gray-400 hover:text-gray-600 transition-colors bg-transparent border-none cursor-pointer">✕</button>
         </div>
-        <div style={{ padding: 24 }}>{children}</div>
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );
 };
 
 export default function AdminCoordinators() {
+  const { showToast } = useToast();
   const [coordinators, setCoordinators] = useState([]);
-  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState("approved");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -53,12 +38,8 @@ export default function AdminCoordinators() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [approved, pend] = await Promise.all([
-        adminService.getApprovedCoordinators(),
-        adminService.getPendingCoordinators(),
-      ]);
+      const approved = await adminService.getApprovedCoordinators();
       setCoordinators(approved || []);
-      setPending(pend || []);
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
@@ -70,15 +51,8 @@ export default function AdminCoordinators() {
     try {
       await adminService.createCoordinator({ name: form.name.trim(), email: form.email.trim() });
       setCreateOpen(false); setForm({ name: "", email: "" }); loadData();
-      alert("Coordinator created! Credentials sent via email.");
+      showToast("Coordinator created! Credentials sent via email.");
     } catch (err) { setError(err.response?.data?.message || "Failed to create coordinator"); } finally { setSubmitting(false); }
-  };
-
-  const handleApprove = async (id) => {
-    try {
-      await adminService.approveCoordinator(id);
-      loadData();
-    } catch (err) { alert(err.response?.data?.message || "Failed to approve"); }
   };
 
   const handleDelete = async () => {
@@ -86,7 +60,7 @@ export default function AdminCoordinators() {
     try {
       await adminService.deleteCoordinator(selected._id);
       setDeleteOpen(false); setSelected(null); if (viewOpen) { setViewOpen(false); setCoordDetail(null); } loadData();
-    } catch (err) { alert(err.response?.data?.message || "Failed to delete"); } finally { setSubmitting(false); }
+    } catch (err) { showToast(err.response?.data?.message || "Failed to delete", "error"); } finally { setSubmitting(false); }
   };
 
   const openView = async (coord) => {
@@ -97,8 +71,7 @@ export default function AdminCoordinators() {
     } catch (err) { console.error(err); }
   };
 
-  const list = tab === "approved" ? coordinators : pending;
-  const filtered = list.filter(c => {
+  const filtered = coordinators.filter(c => {
     if (!search) return true;
     const s = search.toLowerCase();
     return c.name?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s);
@@ -106,194 +79,155 @@ export default function AdminCoordinators() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 300 }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 36, height: 36, border: "3px solid #e5e7eb", borderTop: "3px solid #6366f1", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-          <p style={{ color: "#9ca3af", fontSize: 13 }}>Loading coordinators…</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="flex justify-center items-center min-h-[300px]">
+        <div className="text-center">
+          <div className="w-9 h-9 border-[3px] border-gray-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-400 text-sm font-medium">Loading coordinators…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>Coordinators</h2>
-        <button style={btn("#6366f1", "#fff")} onClick={() => { setForm({ name: "", email: "" }); setError(""); setCreateOpen(true); }}>
+      <div className="flex justify-between items-center flex-wrap gap-3">
+        <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Coordinators</h2>
+        <button onClick={() => { setForm({ name: "", email: "" }); setError(""); setCreateOpen(true); }}
+          className="bg-indigo-500 hover:bg-indigo-600 text-white border-none rounded-xl px-5 py-2.5 text-sm font-bold transition-colors cursor-pointer">
           + Create Coordinator
         </button>
       </div>
 
-      {/* Tabs + Search */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        {["approved", "pending"].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, border: "1px solid", cursor: "pointer",
-            background: tab === t ? "#1e293b" : "#fff", color: tab === t ? "#fff" : "#374151",
-            borderColor: tab === t ? "#1e293b" : "#e5e7eb", transition: "all 0.15s",
-          }}>
-            {t === "approved" ? `Approved (${coordinators.length})` : `Pending (${pending.length})`}
-          </button>
-        ))}
+      {/* Search */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm font-bold text-gray-600">Total: {coordinators.length} Coordinators</p>
         <input placeholder="Search coordinators…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ ...input, maxWidth: 260, background: "#fff", marginLeft: "auto" }} />
+          className="max-w-[300px] py-2.5 px-3.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300 transition-all placeholder-gray-400" />
       </div>
 
-      {/* Coordinator list */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13, background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb" }}>
-            No {tab} coordinators found.
+          <div className="col-span-full bg-white rounded-2xl border border-gray-200/80 shadow-sm py-16 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mx-auto mb-3">👥</div>
+            <p className="text-sm font-semibold text-gray-400">No coordinators found.</p>
           </div>
         ) : (
           filtered.map(c => (
-            <div key={c._id} style={{
-              background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", padding: 20,
-              transition: "box-shadow 0.2s, transform 0.2s", cursor: "pointer",
-            }}
-              onClick={() => tab === "approved" && openView(c)}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                  display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 16, flexShrink: 0,
-                }}>
+            <div key={c._id} onClick={() => openView(c)}
+              className="group bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-base shrink-0">
                   {c.name?.charAt(0)?.toUpperCase() || "?"}
                 </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{c.name}</div>
-                  <div style={{ fontSize: 12, color: "#9ca3af" }}>{c.email}</div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{c.name}</p>
+                  <p className="text-[11px] text-gray-400 font-medium truncate">{c.email}</p>
                 </div>
               </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6,
-                  background: c.isApproved ? "#ecfdf5" : "#fef3c7", color: c.isApproved ? "#059669" : "#d97706",
-                }}>
-                  {c.isApproved ? "Approved" : "Pending"}
-                </span>
-                {tab === "pending" && (
-                  <button onClick={(e) => { e.stopPropagation(); handleApprove(c._id); }}
-                    style={{ ...btn("#059669", "#fff"), padding: "6px 14px", fontSize: 12 }}>
-                    Approve ✓
-                  </button>
-                )}
-                {tab === "approved" && (
-                  <button onClick={(e) => { e.stopPropagation(); setSelected(c); setDeleteOpen(true); }}
-                    style={{ ...btn("#fef2f2", "#dc2626"), padding: "6px 14px", fontSize: 12 }}>
-                    Delete
-                  </button>
-                )}
-              </div>
+              <button className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-bold transition-colors border border-gray-200 cursor-pointer">
+                View Details →
+              </button>
             </div>
           ))
         )}
       </div>
 
-      {/* CREATE MODAL */}
+      {/* ── CREATE ── */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Coordinator">
-        {error && <div style={{ padding: "10px 14px", background: "#fef2f2", color: "#dc2626", borderRadius: 8, fontSize: 13, marginBottom: 16, border: "1px solid #fecaca" }}>{error}</div>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ padding: "12px 16px", background: "#eef2ff", borderRadius: 10, fontSize: 12, color: "#4f46e5", fontWeight: 500 }}>
+        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">{error}</div>}
+        <div className="flex flex-col gap-4">
+          <div className="p-3.5 bg-indigo-50 rounded-xl text-xs text-indigo-600 font-medium">
             A random password will be generated and sent to the coordinator's email address automatically.
           </div>
-          <div><label style={label}>Name *</label><input style={input} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" /></div>
-          <div><label style={label}>Email *</label><input style={input} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="coordinator@email.com" /></div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid #f3f4f6" }}>
-            <button onClick={() => setCreateOpen(false)} style={btn("#f3f4f6", "#374151")}>Cancel</button>
-            <button onClick={handleCreate} disabled={submitting} style={{ ...btn("#6366f1", "#fff"), opacity: submitting ? 0.6 : 1 }}>
-              {submitting ? "Creating…" : "Create & Send Credentials"}
-            </button>
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 block">Name *</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name"
+              className="w-full py-2.5 px-3.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 block">Email *</label>
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="coordinator@email.com"
+              className="w-full py-2.5 px-3.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+          </div>
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+            <button onClick={() => setCreateOpen(false)} className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold border-none cursor-pointer hover:bg-gray-200 transition-colors">Cancel</button>
+            <button onClick={handleCreate} disabled={submitting} className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-bold border-none cursor-pointer hover:bg-indigo-600 transition-colors disabled:opacity-60">{submitting ? "Creating…" : "Create & Send Credentials"}</button>
           </div>
         </div>
       </Modal>
 
-      {/* VIEW DETAIL MODAL */}
-      <Modal open={viewOpen} onClose={() => { setViewOpen(false); setCoordDetail(null); }} title="Coordinator Details" width={580}>
+      {/* ── VIEW ── */}
+      <Modal open={viewOpen} onClose={() => { setViewOpen(false); setCoordDetail(null); }} title="Coordinator Details" wide>
         {coordDetail ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 22, flexShrink: 0,
-              }}>
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
                 {coordDetail.coordinator?.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>{coordDetail.coordinator?.name}</div>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>{coordDetail.coordinator?.email}</div>
+                <p className="text-xl font-extrabold text-gray-900">{coordDetail.coordinator?.name}</p>
+                <p className="text-sm text-gray-500">{coordDetail.coordinator?.email}</p>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div className="grid grid-cols-3 gap-2.5">
               {[
                 { l: "Designation", v: coordDetail.coordinator?.designation || "—" },
                 { l: "Institution", v: coordDetail.coordinator?.institutionName || "—" },
                 { l: "Gender", v: coordDetail.coordinator?.gender || "—" },
               ].map(item => (
-                <div key={item.l} style={{ background: "#f9fafb", padding: "12px 14px", borderRadius: 10, border: "1px solid #f3f4f6" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>{item.l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", marginTop: 2, textTransform: "capitalize" }}>{item.v}</div>
+                <div key={item.l} className="bg-gray-50 rounded-xl px-3.5 py-3 border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{item.l}</p>
+                  <p className="text-xs font-semibold text-gray-900 capitalize mt-0.5">{item.v}</p>
                 </div>
               ))}
             </div>
 
             <div>
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Assigned Events ({coordDetail.assignedEvents?.length || 0})</h4>
+              <h4 className="text-sm font-bold text-gray-700 mb-2">Assigned Events ({coordDetail.assignedEvents?.length || 0})</h4>
               {(coordDetail.assignedEvents || []).length === 0 ? (
-                <div style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12, background: "#f9fafb", borderRadius: 10 }}>No events assigned.</div>
+                <div className="py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-xl">No events assigned.</div>
               ) : (
-                <div style={{ borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
                   {coordDetail.assignedEvents.map(e => (
-                    <div key={e._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderBottom: "1px solid #f3f4f6" }}>
+                    <div key={e._id} className="flex justify-between items-center px-4 py-3 border-b border-gray-100 last:border-b-0">
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{e.title}</div>
-                        <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                          {e.eventDate ? new Date(e.eventDate).toLocaleDateString() : "No date"}
-                        </div>
+                        <p className="text-sm font-semibold text-gray-900">{e.title}</p>
+                        <p className="text-[11px] text-gray-400">{e.eventDate ? new Date(e.eventDate).toLocaleDateString() : "No date"}</p>
                       </div>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4,
-                        background: e.status === "upcoming" ? "#eef2ff" : e.status === "ongoing" ? "#ecfdf5" : "#f3f4f6",
-                        color: e.status === "upcoming" ? "#4f46e5" : e.status === "ongoing" ? "#059669" : "#6b7280",
-                        textTransform: "capitalize",
-                      }}>{e.status}</span>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize ${
+                        e.status === "OPEN" || e.status === "upcoming" ? "bg-indigo-50 text-indigo-600" : e.status === "LIVE" || e.status === "ongoing" ? "bg-emerald-50 text-emerald-600" : e.status === "CLOSED" ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-gray-500"
+                      }`}>{e.status}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f3f4f6" }}>
+            <div className="flex justify-end pt-3 border-t border-gray-100">
               <button onClick={() => { setSelected(coordDetail.coordinator); setDeleteOpen(true); }}
-                style={btn("#dc2626", "#fff")}>
+                className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold border-none cursor-pointer hover:bg-red-700 transition-colors">
                 Delete Coordinator
               </button>
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
-            <div style={{ width: 30, height: 30, border: "3px solid #e5e7eb", borderTop: "3px solid #6366f1", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-[3px] border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
           </div>
         )}
       </Modal>
 
-      {/* DELETE CONFIRM */}
-      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Coordinator" width={420}>
-        <p style={{ fontSize: 14, color: "#374151", marginBottom: 20 }}>
-          Are you sure you want to delete <strong>{selected?.name}</strong>? They will be unassigned from all events. This action cannot be undone.
+      {/* ── DELETE ── */}
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Coordinator">
+        <p className="text-sm text-gray-600 mb-5">
+          Are you sure you want to delete <strong className="text-gray-900">{selected?.name}</strong>? They will be unassigned from all events. This action cannot be undone.
         </p>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={() => setDeleteOpen(false)} style={btn("#f3f4f6", "#374151")}>Cancel</button>
-          <button onClick={handleDelete} disabled={submitting} style={{ ...btn("#dc2626", "#fff"), opacity: submitting ? 0.6 : 1 }}>
-            {submitting ? "Deleting…" : "Delete Coordinator"}
-          </button>
+        <div className="flex justify-end gap-2.5">
+          <button onClick={() => setDeleteOpen(false)} className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold border-none cursor-pointer hover:bg-gray-200 transition-colors">Cancel</button>
+          <button onClick={handleDelete} disabled={submitting} className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold border-none cursor-pointer hover:bg-red-700 transition-colors disabled:opacity-60">{submitting ? "Deleting…" : "Delete Coordinator"}</button>
         </div>
       </Modal>
     </div>

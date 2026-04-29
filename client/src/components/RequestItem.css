@@ -1,71 +1,72 @@
+/* ── Request Item ── */
 .request-item {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-  transition: box-shadow 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
 }
 
 .request-item:hover {
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.09);
+  background: #f9fafb;
 }
 
 .request-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #dbeafe;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
 .request-info {
   flex: 1;
+  min-width: 0;
 }
 
 .request-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
 }
 
 .request-email {
-  font-size: 12px;
-  color: #64748b;
-  margin: 0 0 5px;
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 2px 0 0;
 }
 
 .request-role {
-  font-size: 11px;
-  font-weight: 600;
-  background: #f1f5f9;
-  color: #475569;
-  padding: 2px 8px;
-  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #d97706;
+  margin-top: 4px;
+  display: inline-block;
 }
 
 .request-meta {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .request-date {
   font-size: 11px;
-  color: #94a3b8;
+  color: #9ca3af;
   margin: 0;
-  white-space: nowrap;
 }
 
 .request-actions {
@@ -73,42 +74,34 @@
   gap: 6px;
 }
 
-.btn-approve,
-.btn-reject {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: inherit;
-}
-
 .btn-approve {
-  background: #2563eb;
-  color: #fff;
+  padding: 5px 12px;
+  background: #ecfdf5;
+  color: #059669;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
 .btn-approve:hover {
-  background: #1d4ed8;
+  background: #d1fae5;
 }
 
 .btn-reject {
-  background: #f1f5f9;
-  color: #64748b;
+  padding: 5px 12px;
+  background: #fef2f2;
+  color: #ef4444;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
 .btn-reject:hover {
   background: #fee2e2;
-  color: #dc2626;
-}
-
-@media (max-width: 600px) {
-  .request-meta {
-    align-items: flex-start;
-  }
-  .request-item {
-    flex-wrap: wrap;
-  }
 }

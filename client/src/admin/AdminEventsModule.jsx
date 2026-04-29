@@ -2,18 +2,24 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as adminService from "../services/adminService";
 import * as analyticsService from "../services/analyticsService";
+import { useToast } from "../context/ToastContext";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 // Status mapping from backend to display
-const statusMap = { upcoming: "Open", ongoing: "Live", completed: "Completed" };
+const statusMap = { OPEN: "Open", LIVE: "Live", COMPLETED: "Completed", CLOSED: "Closed", upcoming: "Open", ongoing: "Live", completed: "Completed", closed: "Closed" };
 
 // --- SUB-COMPONENTS ---
 const StatusBadge = ({ status }) => {
   const styles = {
     "Draft": "bg-gray-100 text-gray-600 border-gray-200",
     "Open": "bg-blue-100 text-blue-700 border-blue-200",
+    "OPEN": "bg-blue-100 text-blue-700 border-blue-200",
     "Closed": "bg-red-100 text-red-700 border-red-200",
+    "CLOSED": "bg-red-100 text-red-700 border-red-200",
     "Live": "bg-green-100 text-green-700 border-green-200",
-    "Completed": "bg-slate-700 text-white border-slate-800"
+    "LIVE": "bg-green-100 text-green-700 border-green-200",
+    "Completed": "bg-slate-700 text-white border-slate-800",
+    "COMPLETED": "bg-slate-700 text-white border-slate-800"
   };
   return (
     <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wide ${styles[status] || styles["Draft"]}`}>
@@ -43,6 +49,7 @@ const ReviewItem = ({ review }) => (
 // --- MAIN COMPONENT ---
 export default function AdminEventsModule() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   
   const [viewMode, setViewMode] = useState("list");
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -64,6 +71,7 @@ export default function AdminEventsModule() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editEvent, setEditEvent] = useState({ id: "", title: "", description: "" });
   const [editLoading, setEditLoading] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ show: false, action: null, title: "", message: "", type: "primary" });
 
   // Fetch coordinators when opening create/edit modal
   useEffect(() => {
@@ -110,7 +118,10 @@ export default function AdminEventsModule() {
   };
 
   const handleCreateEvent = async () => {
-    if (!newEvent.title) return alert("Event name is required");
+    if (!newEvent.title) {
+      showToast("Event name is required", "error");
+      return;
+    }
     setCreateLoading(true);
     try {
       const created = await adminService.createEvent({
@@ -122,8 +133,9 @@ export default function AdminEventsModule() {
       setIsCreateModalOpen(false);
       setNewEvent({ title: "", description: "" });
       setSelectedCoords([]);
+      showToast("Event created successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to create event");
+      showToast(err.response?.data?.message || "Failed to create event", "error");
     } finally {
       setCreateLoading(false);
     }
@@ -140,7 +152,10 @@ export default function AdminEventsModule() {
   };
 
   const handleUpdateEvent = async () => {
-    if (!editEvent.title) return alert("Event name is required");
+    if (!editEvent.title) {
+      showToast("Event name is required", "error");
+      return;
+    }
     setEditLoading(true);
     try {
       const updated = await adminService.updateEvent(editEvent.id, {
@@ -151,22 +166,31 @@ export default function AdminEventsModule() {
       setEventsList(prev => prev.map(e => e._id === updated._id ? updated : e));
       setSelectedEventDetail(updated);
       setIsEditModalOpen(false);
+      showToast("Event updated successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update event");
+      showToast(err.response?.data?.message || "Failed to update event", "error");
     } finally {
       setEditLoading(false);
     }
   };
 
-  const handleDeleteEvent = async () => {
-    if (!window.confirm("Are you sure you want to delete this event? This action cannot be undone.")) return;
-    try {
-      await adminService.deleteEvent(selectedEventId);
-      setEventsList(prev => prev.filter(e => e._id !== selectedEventId));
-      handleBackToList();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete event");
-    }
+  const handleDeleteEvent = () => {
+    setConfirmConfig({
+      show: true,
+      title: "Delete Event?",
+      message: "Are you sure you want to delete this event? This action cannot be undone and will remove all registrations.",
+      type: "danger",
+      action: async () => {
+        try {
+          await adminService.deleteEvent(selectedEventId);
+          setEventsList(prev => prev.filter(e => e._id !== selectedEventId));
+          handleBackToList();
+          showToast("Event deleted successfully!");
+        } catch (err) {
+          showToast(err.response?.data?.message || "Failed to delete event", "error");
+        }
+      }
+    });
   };
 
   // Map API data to display format
@@ -634,6 +658,17 @@ export default function AdminEventsModule() {
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       `}</style>
+      <ConfirmationModal
+        isOpen={confirmConfig.show}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={() => {
+          confirmConfig.action();
+          setConfirmConfig({ ...confirmConfig, show: false });
+        }}
+        onCancel={() => setConfirmConfig({ ...confirmConfig, show: false })}
+      />
     </div>
   );
 }

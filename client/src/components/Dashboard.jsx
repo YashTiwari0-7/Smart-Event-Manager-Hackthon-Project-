@@ -50,14 +50,14 @@ const Dashboard = () => {
       id: 1,
       label: "Total Events",
       value: events.length,
-      change: `${events.filter(e => e.status === 'upcoming').length} upcoming`,
+      change: `${events.filter(e => e.status === 'OPEN').length} open`,
       icon: "📅",
       color: "#6366f1"
     },
     {
       id: 2,
       label: "Active Events",
-      value: events.filter(e => e.status === 'ongoing').length,
+      value: events.filter(e => e.status === 'LIVE').length,
       change: "Currently running",
       icon: "🔥",
       color: "#f59e0b"

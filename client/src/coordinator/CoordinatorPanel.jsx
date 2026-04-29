@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import CoordinatorHome from "./CoordinatorHome";
 import CoordinatorEvents from "./CoordinatorEvents";
+import CoordinatorAnalytics from "./CoordinatorAnalytics";
 
 const NAV_ITEMS = [
   { id: "home", label: "Home", icon: "🏠" },
   { id: "events", label: "Events", icon: "📅" },
+  { id: "analytics", label: "Analytics", icon: "📊" },
 ];
 
 export default function CoordinatorPanel() {
@@ -22,125 +24,144 @@ export default function CoordinatorPanel() {
     switch (activeSection) {
       case "home": return <CoordinatorHome onNavigate={setActiveSection} />;
       case "events": return <CoordinatorEvents />;
+      case "analytics": return <CoordinatorAnalytics />;
       default: return <CoordinatorHome onNavigate={setActiveSection} />;
     }
   };
 
+  const initials = (user?.name || "C").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f8f9fb", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? 240 : 64,
-        background: "linear-gradient(180deg, #1e1b4b 0%, #312e81 100%)",
-        color: "#fff",
-        transition: "width 0.25s cubic-bezier(.4,0,.2,1)",
-        display: "flex", flexDirection: "column",
-        position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50, overflow: "hidden",
-      }}>
-        <div style={{
-          padding: sidebarOpen ? "24px 20px 20px" : "24px 12px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          display: "flex", alignItems: "center", gap: 10, minHeight: 72,
-        }}>
-          <span style={{ fontSize: 24 }}>🎯</span>
+    <div className="flex min-h-screen bg-gray-100 font-sans">
+
+      {/* ── Sidebar ── */}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 text-white transition-all duration-300 ease-in-out ${sidebarOpen ? "w-60" : "w-16"} overflow-hidden`}>
+
+        {/* Brand */}
+        <div className={`flex items-center gap-3 border-b border-white/[0.06] min-h-[72px] shrink-0 ${sidebarOpen ? "px-5 py-6" : "px-3 py-6 justify-center"}`}>
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 backdrop-blur-sm">
+            ⚡
+          </div>
           {sidebarOpen && (
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.3px", lineHeight: 1.1 }}>Smart Event</div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Coordinator</div>
+            <div className="overflow-hidden">
+              <p className="text-[15px] font-extrabold tracking-tight leading-none whitespace-nowrap">SMART Event</p>
+              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[2px] mt-0.5">Coordinator</p>
             </div>
           )}
         </div>
 
-        <nav style={{ flex: 1, padding: "16px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+        {/* Navigation */}
+        <nav className="flex-1 flex flex-col gap-1 px-2 py-4">
           {NAV_ITEMS.map(item => {
             const isActive = activeSection === item.id;
             return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: sidebarOpen ? "12px 16px" : "12px 0",
-                justifyContent: sidebarOpen ? "flex-start" : "center",
-                borderRadius: 10, border: "none", cursor: "pointer", fontSize: 14,
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? "#fff" : "rgba(255,255,255,0.55)",
-                background: isActive ? "rgba(139,92,246,0.3)" : "transparent",
-                transition: "all 0.15s", width: "100%", textAlign: "left",
-              }}
-                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? "rgba(139,92,246,0.3)" : "transparent"; }}
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  sidebarOpen ? "px-4 py-3" : "px-0 py-3 justify-center"
+                } ${
+                  isActive
+                    ? "bg-white/[0.12] text-white shadow-sm shadow-black/10"
+                    : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+                }`}
               >
-                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <span className={`text-lg transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-105"}`}>
+                  {item.icon}
+                </span>
                 {sidebarOpen && <span>{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
+        {/* Footer */}
         {sidebarOpen && (
-          <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+          <div className="px-5 py-4 border-t border-white/[0.06] text-[11px] text-white/20 font-medium">
             © 2026 SmartEvent
           </div>
         )}
       </aside>
 
-      {/* Main */}
-      <div style={{ flex: 1, marginLeft: sidebarOpen ? 240 : 64, transition: "margin-left 0.25s cubic-bezier(.4,0,.2,1)", display: "flex", flexDirection: "column" }}>
-        {/* Navbar */}
-        <header style={{
-          height: 64, background: "#fff", borderBottom: "1px solid #e5e7eb",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 24px", position: "sticky", top: 0, zIndex: 40,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-              background: "none", border: "1px solid #e5e7eb", borderRadius: 8, cursor: "pointer",
-              padding: "8px 10px", fontSize: 18, color: "#374151", display: "flex", alignItems: "center",
-            }}>☰</button>
-            <button onClick={() => navigate(-1)} style={{
-              background: "none", border: "1px solid #e5e7eb", borderRadius: 8, cursor: "pointer",
-              padding: "8px 10px", fontSize: 14, color: "#374151", display: "flex", alignItems: "center",
-            }}>← Back</button>
+      {/* ── Main wrapper ── */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${sidebarOpen ? "ml-60" : "ml-16"}`}>
+
+        {/* ── Top Navbar ── */}
+        <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-between px-5 sm:px-6 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+
+          {/* Left: Hamburger */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-colors text-lg"
+              aria-label="Toggle sidebar"
+            >
+              ☰
+            </button>
+            <div className="hidden md:block">
+              <h2 className="text-sm font-bold text-gray-800 leading-tight">
+                {activeSection === "home" ? "Dashboard" : activeSection === "events" ? "Event Management" : "Analytics"}
+              </h2>
+              <p className="text-[11px] text-gray-400 font-medium">Coordinator Portal</p>
+            </div>
           </div>
 
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setProfileOpen(!profileOpen)} style={{
-              display: "flex", alignItems: "center", gap: 10, background: "#f3f4f6",
-              border: "1px solid #e5e7eb", borderRadius: 10, padding: "6px 14px 6px 8px",
-              cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#1f2937",
-            }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: "50%",
-                background: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontWeight: 800, fontSize: 13,
-              }}>{(user?.name || "C").charAt(0).toUpperCase()}</div>
-              <span>{user?.name || "Coordinator"}</span>
-              <span style={{ fontSize: 10, color: "#9ca3af" }}>▼</span>
+          {/* Right: Profile */}
+          <div className="flex items-center gap-3">
+            {/* Notification Bell */}
+            <button className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
+              <span className="text-lg">🔔</span>
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gray-800 text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
+                0
+              </span>
             </button>
 
-            {profileOpen && (
-              <div style={{
-                position: "absolute", right: 0, top: 48, background: "#fff",
-                border: "1px solid #e5e7eb", borderRadius: 12,
-                boxShadow: "0 10px 40px rgba(0,0,0,0.12)", padding: 8, minWidth: 180, zIndex: 60,
-              }}>
-                <div style={{ padding: "10px 14px", fontSize: 12, color: "#6b7280", borderBottom: "1px solid #f3f4f6" }}>
-                  {user?.email || "coordinator@example.com"}
+            {/* Divider */}
+            <div className="w-px h-8 bg-gray-200 hidden sm:block" />
+
+            {/* Profile Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                  {initials}
                 </div>
-                <button onClick={handleLogout} style={{
-                  width: "100%", padding: "10px 14px", background: "none", border: "none",
-                  borderRadius: 8, textAlign: "left", cursor: "pointer", fontSize: 13,
-                  fontWeight: 600, color: "#ef4444",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
-                  onMouseLeave={e => e.currentTarget.style.background = "none"}
-                >Logout</button>
-              </div>
-            )}
+                <div className="text-left hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.name || "Coordinator"}</p>
+                  <p className="text-[10px] text-gray-400 font-medium">Coordinator</p>
+                </div>
+                <svg className="w-3 h-3 text-gray-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {profileOpen && (
+                <>
+                  <div className="fixed inset-0 z-50" onClick={() => setProfileOpen(false)} />
+                  <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden animate-in fade-in slide-in-from-top-1">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-800">{user?.name || "Coordinator"}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{user?.email || "coordinator@example.com"}</p>
+                    </div>
+                    <div className="p-1.5">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
+                      >
+                        <span>🚪</span> Logout
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: 24, maxWidth: 1400, width: "100%", margin: "0 auto" }}>
+        {/* ── Page Content ── */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
           {renderContent()}
         </main>
       </div>

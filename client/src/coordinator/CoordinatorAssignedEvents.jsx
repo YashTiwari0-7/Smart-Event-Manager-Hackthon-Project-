@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as coordinatorService from "../services/coordinatorService";
 
-const statusDisplayMap = { upcoming: 'Open', ongoing: 'Live', completed: 'Completed' };
+const statusDisplayMap = { OPEN: 'Open', CLOSED: 'Closed', LIVE: 'Live', COMPLETED: 'Completed' };
 
 // --- Sub-components ---
 const EventCard = ({ event, navigate }) => {
@@ -54,18 +54,18 @@ const EventCard = ({ event, navigate }) => {
       </div>
 
       {/* Actions */}
-      <div className="mt-auto flex gap-3">
+      <div className="mt-auto flex flex-col gap-3 pt-3">
         <button 
           onClick={() => navigate("/coordinator-management")} 
-          className="flex-1 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm rounded-lg transition-colors shadow-sm"
+          className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm rounded-xl transition-colors shadow-md shadow-violet-200"
         >
-          Configure
+          CONFIGURE EVENT
         </button>
         <button 
           onClick={() => navigate(event.status === "Completed" ? `/coordinator-results/${event.id}` : `/coordinator-operations/${event.id}`)} 
-          className="flex-1 py-2.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg border border-gray-200 transition-colors shadow-sm"
+          className="w-full py-3 bg-white hover:bg-violet-50 text-violet-700 font-extrabold text-sm rounded-xl border-2 border-violet-200 transition-colors shadow-sm"
         >
-          {event.status === "Completed" ? "View Results" : "View Participants"}
+          {event.status === "Completed" ? "VIEW RESULTS" : "VIEW PARTICIPANTS"}
         </button>
       </div>
     </div>
@@ -117,7 +117,7 @@ const CoordinatorAssignedEvents = () => {
         {/* Header Bar */}
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-800 transition-colors text-sm font-bold bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
+            <button onClick={() => navigate(-1)} className="text-violet-600 hover:text-violet-800 transition-colors text-sm font-extrabold bg-violet-50 hover:bg-violet-100 px-4 py-2 rounded-xl border border-violet-200">
               ← Back
             </button>
             <div>

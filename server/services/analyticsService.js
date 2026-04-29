@@ -66,9 +66,9 @@ const getOverallAnalytics = async () => {
     ]);
 
     const totalEvents = events.length;
-    const upcomingEvents = events.filter(e => e.status === 'upcoming').length;
-    const ongoingEvents = events.filter(e => e.status === 'ongoing').length;
-    const completedEvents = events.filter(e => e.status === 'completed').length;
+    const upcomingEvents = events.filter(e => e.status === 'OPEN').length;
+    const ongoingEvents = events.filter(e => e.status === 'LIVE').length;
+    const completedEvents = events.filter(e => e.status === 'COMPLETED').length;
 
     const registered = registrations.filter(r => r.status === 'registered');
     const withdrawn = registrations.filter(r => r.status === 'withdrawn');

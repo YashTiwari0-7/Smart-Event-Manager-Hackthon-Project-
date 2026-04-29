@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as participantService from "../services/participantService";
+import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
+import CertificateTemplate from "../components/CertificateTemplate";
 
 
 
 const typeStyles = {
   Winner:        "bg-gray-900 text-white",
-  Participation: "bg-gray-100 text-gray-600 border border-gray-300",
-  Completion:    "bg-gray-200 text-gray-700",
+  Participation: "bg-gray-100 text-gray-600 border border-gray-300"
 };
 
-const CertCard = ({ cert }) => (
+const CertCard = ({ cert, onDownload }) => (
   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:border-gray-300 transition-all flex flex-col gap-4">
     {/* Certificate Preview */}
     <div className="w-full h-32 bg-gray-50 border border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1 border-dashed">
@@ -25,31 +27,33 @@ const CertCard = ({ cert }) => (
       </div>
       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1"><span>📅</span>{cert.date}</p>
     </div>
-    {cert.url ? (
-      <a href={`http://localhost:5000/api${cert.url}`} target="_blank" rel="noreferrer" className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2">
-        <span>⬇️</span> Download PDF
-      </a>
-    ) : (
-      <button className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2">
-        <span>⬇️</span> Download PDF
-      </button>
-    )}
+    <button 
+      onClick={() => onDownload(cert)}
+      className="w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all flex items-center justify-center gap-2"
+    >
+      <span>⬇️</span> Download PDF
+    </button>
   </div>
 );
 
 const CertificatesPage = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
+  const { user } = useAuth();
   const [filter, setFilter] = useState("All");
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const types = ["All", "Winner", "Participation", "Completion"];
+  const [activeCertData, setActiveCertData] = useState(null);
+  const certTemplateRef = useRef(null);
+  const types = ["All", "Winner", "Participation"];
 
   useEffect(() => {
     const fetchCerts = async () => {
       try {
         const certs = await participantService.getMyCertificates();
-        setCertificates((certs || []).map((c) => ({
+          setCertificates((certs || []).map((c) => ({
           id: c._id, 
+          eventId: c.event?._id || c.event,
           event: c.event?.title || 'Event',
           date: c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'N/A',
           type: c.type === 'achievement' ? 'Winner' : 'Participation',
@@ -64,6 +68,36 @@ const CertificatesPage = () => {
     };
     fetchCerts();
   }, []);
+
+  const handleDownload = async (cert) => {
+    try {
+      const isAchievement = cert.type === 'Winner';
+      // Load user details if not available from cert obj, or we just rely on standard data
+      // We need userName. For participants viewing their own page, we can use useAuth to get user name, or we can fetch it.
+      // Wait, let's just get it from the user session.
+      const userName = user?.name || "Participant";
+
+      setActiveCertData({
+        type: isAchievement ? 'achievement' : 'participation',
+        userName: userName,
+        eventName: cert.event,
+        date: cert.date,
+        rank: isAchievement ? 'a top position' : null
+      });
+
+      // We need to wait for state to update so the invisible template renders with new data
+      setTimeout(async () => {
+        if (certTemplateRef.current) {
+          showToast("Generating high-quality certificate...", "success");
+          await certTemplateRef.current.downloadPDF();
+        }
+      }, 500);
+      
+    } catch (err) {
+      console.error('Download failed:', err);
+      showToast('Failed to generate certificate. Please try again.', 'error');
+    }
+  };
 
   const filtered = filter === "All" ? certificates : certificates.filter(c => c.type === filter);
 
@@ -96,7 +130,7 @@ const CertificatesPage = () => {
           {[
             { label: "Total",    value: certificates.length, icon: "📜" },
             { label: "Winner",   value: certificates.filter(c => c.type === "Winner").length, icon: "🏆" },
-            { label: "Completion", value: certificates.filter(c => c.type === "Completion").length, icon: "✅" },
+            { label: "Participation", value: certificates.filter(c => c.type === "Participation").length, icon: "✅" },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
               <span className="text-2xl">{s.icon}</span>
@@ -127,7 +161,7 @@ const CertificatesPage = () => {
 
         {/* Certificate Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(cert => <CertCard key={cert.id} cert={cert} />)}
+          {filtered.map(cert => <CertCard key={cert.id} cert={cert} onDownload={handleDownload} />)}
           {filtered.length === 0 && (
             <div className="col-span-3 text-center py-16 text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
               No certificates in this category yet.
@@ -139,6 +173,9 @@ const CertificatesPage = () => {
           <p className="text-xs text-gray-400">© 2025 SmartEvent Platform · Participant Portal</p>
         </div>
       </main>
+      
+      {/* Invisible render of the beautiful HTML/CSS certificate */}
+      <CertificateTemplate ref={certTemplateRef} certData={activeCertData} />
     </div>
   );
 };

@@ -1,55 +1,55 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import AdminHome from "./AdminHome";
-import AdminEvents from "./AdminEvents";
-import AdminCoordinators from "./AdminCoordinators";
-import AdminAnalytics from "./AdminAnalytics";
+import ParticipantHome from "./ParticipantHome";
+import ParticipantMyEvents from "./ParticipantMyEvents";
+import ParticipantAchievements from "./ParticipantAchievements";
+import ParticipantCertificates from "./ParticipantCertificates";
 
 const NAV_ITEMS = [
-  { id: "home", label: "Home", icon: "🏠" },
-  { id: "events", label: "Events", icon: "📅" },
-  { id: "coordinators", label: "Coordinators", icon: "👥" },
-  { id: "analytics", label: "Analytics", icon: "📊" },
+  { id: "home",         label: "Home",         icon: "🏠" },
+  { id: "my-events",   label: "My Events",    icon: "📅" },
+  { id: "achievements",label: "Achievements", icon: "🏆" },
+  { id: "certificates",label: "Certificates", icon: "📜" },
 ];
 
-export default function AdminPanel() {
+export default function ParticipantPanel() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState("home");
+  const [active, setActive]         = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => { logout(); navigate("/"); };
 
   const renderContent = () => {
-    switch (activeSection) {
-      case "home": return <AdminHome onNavigate={setActiveSection} />;
-      case "events": return <AdminEvents />;
-      case "coordinators": return <AdminCoordinators />;
-      case "analytics": return <AdminAnalytics />;
-      default: return <AdminHome onNavigate={setActiveSection} />;
+    switch (active) {
+      case "home":         return <ParticipantHome onNavigate={setActive} />;
+      case "my-events":   return <ParticipantMyEvents onBack={() => setActive("home")} />;
+      case "achievements": return <ParticipantAchievements onBack={() => setActive("home")} />;
+      case "certificates": return <ParticipantCertificates onBack={() => setActive("home")} />;
+      default:             return <ParticipantHome onNavigate={setActive} />;
     }
   };
 
-  const initials = (user?.name || "A").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  const pageTitle = { home: "Dashboard", events: "Event Management", coordinators: "Coordinators", analytics: "Analytics" }[activeSection] || "Dashboard";
+  const initials = (user?.name || "P").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const pageTitle = { home: "Dashboard", "my-events": "My Events", achievements: "Achievements", certificates: "Certificates" }[active] || "Dashboard";
 
   return (
     <div className="flex min-h-screen bg-gray-100 font-sans">
 
       {/* ── Sidebar ── */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-white transition-all duration-300 ease-in-out ${sidebarOpen ? "w-60" : "w-16"} overflow-hidden`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 ease-in-out ${sidebarOpen ? "w-60" : "w-16"} overflow-hidden`}>
 
         {/* Brand */}
         <div className={`flex items-center gap-3 border-b border-white/[0.06] min-h-[72px] shrink-0 ${sidebarOpen ? "px-5 py-6" : "px-3 py-6 justify-center"}`}>
-          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-lg shrink-0">
-            ⚡
+          <div className="w-9 h-9 rounded-xl bg-blue-500/20 flex items-center justify-center text-lg shrink-0">
+            🎓
           </div>
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="text-[15px] font-extrabold tracking-tight leading-none whitespace-nowrap">SMART Event</p>
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[2px] mt-0.5">Admin Panel</p>
+              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[2px] mt-0.5">Participant</p>
             </div>
           )}
         </div>
@@ -57,11 +57,11 @@ export default function AdminPanel() {
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-1 px-2 py-4">
           {NAV_ITEMS.map(item => {
-            const isActive = activeSection === item.id;
+            const isActive = active === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => setActive(item.id)}
                 className={`group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   sidebarOpen ? "px-4 py-3" : "px-0 py-3 justify-center"
                 } ${
@@ -79,7 +79,6 @@ export default function AdminPanel() {
           })}
         </nav>
 
-        {/* Footer */}
         {sidebarOpen && (
           <div className="px-5 py-4 border-t border-white/[0.06] text-[11px] text-white/20 font-medium">
             © 2026 SmartEvent
@@ -93,7 +92,6 @@ export default function AdminPanel() {
         {/* ── Top Navbar ── */}
         <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-between px-5 sm:px-6 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
 
-          {/* Left */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -104,13 +102,11 @@ export default function AdminPanel() {
             </button>
             <div className="hidden md:block">
               <h2 className="text-sm font-bold text-gray-800 leading-tight">{pageTitle}</h2>
-              <p className="text-[11px] text-gray-400 font-medium">Admin Portal</p>
+              <p className="text-[11px] text-gray-400 font-medium">Participant Portal</p>
             </div>
           </div>
 
-          {/* Right */}
           <div className="flex items-center gap-3">
-            {/* Notification Bell */}
             <button className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
               <span className="text-lg">🔔</span>
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-slate-800 text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">0</span>
@@ -118,18 +114,17 @@ export default function AdminPanel() {
 
             <div className="w-px h-8 bg-gray-200 hidden sm:block" />
 
-            {/* Profile Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
                   {initials}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.name || "Admin"}</p>
-                  <p className="text-[10px] text-gray-400 font-medium">Super Admin</p>
+                  <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.name || "Participant"}</p>
+                  <p className="text-[10px] text-gray-400 font-medium">Participant</p>
                 </div>
                 <svg className="w-3 h-3 text-gray-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -141,8 +136,8 @@ export default function AdminPanel() {
                   <div className="fixed inset-0 z-50" onClick={() => setProfileOpen(false)} />
                   <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-semibold text-gray-800">{user?.name || "Admin"}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{user?.email || "admin@example.com"}</p>
+                      <p className="text-sm font-semibold text-gray-800">{user?.name || "Participant"}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
                     </div>
                     <div className="p-1.5">
                       <button
@@ -159,8 +154,7 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* ── Page Content ── */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
           {renderContent()}
         </main>
       </div>

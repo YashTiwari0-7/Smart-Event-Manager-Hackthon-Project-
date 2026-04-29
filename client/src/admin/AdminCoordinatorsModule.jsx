@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as adminService from "../services/adminService";
+import { useToast } from "../context/ToastContext";
 
 
 
@@ -81,6 +82,7 @@ const RequestRow = ({ request, onApprove, onReject }) => (
 // --- MAIN COMPONENT ---
 export default function AdminCoordinatorsModule() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   
   const [viewMode, setViewMode] = useState("list");
   const [coordinators, setCoordinators] = useState([]);
@@ -124,8 +126,9 @@ export default function AdminCoordinatorsModule() {
       };
       setCoordinators(prev => [...prev, newCoord]);
       setRequests(prev => prev.filter(r => r.id !== request.id));
+      showToast("Coordinator approved successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to approve coordinator');
+      showToast(err.response?.data?.message || 'Failed to approve coordinator', "error");
     } finally {
       setApproveLoading(null);
     }

@@ -11,7 +11,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-connectDB();
+connectDB().then(async () => {
+    // One-time migration: rename ONGOING → LIVE for existing events
+    try {
+        const mongoose = require('mongoose');
+        const col = mongoose.connection.db.collection('events');
+        
+        let modified = 0;
+        const updates = [
+            { query: { status: { $in: ['ONGOING', 'ongoing', 'live', 'Live'] } }, update: { $set: { status: 'LIVE' } } },
+            { query: { status: { $in: ['open', 'Open', 'upcoming'] } }, update: { $set: { status: 'OPEN' } } },
+            { query: { status: { $in: ['closed', 'Closed'] } }, update: { $set: { status: 'CLOSED' } } },
+            { query: { status: { $in: ['completed', 'Completed'] } }, update: { $set: { status: 'COMPLETED' } } }
+        ];
+
+        for (const { query, update } of updates) {
+            const result = await col.updateMany(query, update);
+            modified += result.modifiedCount;
+        }
+
+        if (modified > 0) {
+            console.log(`Migration: Normalized ${modified} event statuses to uppercase enum`);
+        }
+    } catch (err) {
+        console.error('Migration warning (non-fatal):', err.message);
+    }
+});
 
 app.get('/', (req, res) => {
     res.json({ message: 'Smart Event Manager API is running' });

@@ -160,7 +160,7 @@ export default function CoordinatorConfigure({ event, onBack }) {
         {form.participationType === "team" && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div><label style={lbl}>Min Team Size</label><input style={inp} type="number" min="1" disabled={isLocked} value={form.minTeamSize} onChange={e => set("minTeamSize", e.target.value)} /></div>
-            <div><label style={lbl}>Max Team Size</label><input style={inp} type="number" min="1" disabled={isLocked} value={form.maxTeamSize} onChange={e => set("maxTeamSize", e.target.value)} /></div>
+            <div><label style={lbl}>Team Member Size (max members per team)</label><input style={inp} type="number" min="1" disabled={isLocked} value={form.maxTeamSize} onChange={e => set("maxTeamSize", e.target.value)} /></div>
             <div><label style={lbl}>Total Teams</label><input style={inp} type="number" min="1" disabled={isLocked} value={form.totalTeams} onChange={e => set("totalTeams", e.target.value)} /></div>
             <div>
               <label style={lbl}>Gender Reserve</label>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as coordinatorService from "../services/coordinatorService";
+import { useToast } from "../context/ToastContext";
 
 // --- MOCK DATA FOR ANALYTICS/LOGS (To be replaced later) ---
 
@@ -121,6 +122,7 @@ const CertificatePreview = ({ template, participantName, eventName, position, da
 export default function CoordinatorResultsModule() {
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const { showToast } = useToast();
 
   const [event, setEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -154,15 +156,17 @@ export default function CoordinatorResultsModule() {
 
         try {
           const participantsData = await coordinatorService.getEventParticipants(eventId);
-          // Get unique teams if team event, else individuals
-          const mapped = (participantsData || []).map(p => ({
-            id: p.user?._id || p._id,
-            name: p.team?.name || p.user?.name || "Unknown",
-            teamName: p.team?.name || null
-          }));
+          const mapped = (participantsData || []).map(p => {
+            const isTeam = foundEvent.participationType === 'team';
+            return {
+              id: isTeam ? (p.team?._id || p._id) : (p.user?._id || p._id),
+              name: isTeam ? (p.team?.name || "Unknown Team") : (p.user?.name || "Unknown User"),
+              teamName: p.team?.name || null
+            };
+          });
           
-          // Unique entries by name (helpful for teams)
-          const uniqueParticipants = Array.from(new Map(mapped.map(item => [item.name, item])).values());
+          // Unique entries by id (helpful for teams where multiple members might be in participantsData)
+          const uniqueParticipants = Array.from(new Map(mapped.map(item => [item.id, item])).values());
           setParticipants(uniqueParticipants);
         } catch (err) {
           console.error("Failed to fetch participants");
@@ -210,7 +214,7 @@ export default function CoordinatorResultsModule() {
       });
       setResultsError("");
       setResultsSaved(true);
-      alert("Results declared successfully! Certificates are now unlocked.");
+      showToast("Results declared successfully! Certificates are now unlocked.");
     } catch (err) {
       setResultsError(err.response?.data?.message || "Failed to save results.");
     }
@@ -228,9 +232,9 @@ export default function CoordinatorResultsModule() {
   const generateCertificates = async () => {
     try {
       await coordinatorService.generateCertificates(eventId);
-      alert(`Successfully generated certificates! They are now available to participants.`);
+      showToast(`Successfully generated certificates! They are now available to participants.`);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to generate certificates.");
+      showToast(err.response?.data?.message || "Failed to generate certificates.", "error");
     }
   };
 
@@ -428,7 +432,7 @@ export default function CoordinatorResultsModule() {
                 </div>
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
-                  <button disabled={!resultsSaved} onClick={() => alert("Downloading sample template...")} className="px-4 py-2 text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                  <button disabled={!resultsSaved} onClick={() => showToast("Downloading sample template...")} className="px-4 py-2 text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                     Download Sample
                   </button>
                   <button disabled={!resultsSaved} onClick={generateCertificates} className="px-6 py-2 text-sm font-bold bg-gray-900 text-white hover:bg-gray-800 rounded-lg shadow-sm transition-colors flex items-center gap-2">
@@ -452,17 +456,18 @@ export default function CoordinatorResultsModule() {
               </div>
               <div className="p-5">
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                  <StatCard title="Total Reg." value={mockAnalytics.totalRegistrations} />
-                  <StatCard title="Avg Team" value={mockAnalytics.avgTeamSize} description="Members per team" />
-                  <StatCard title="Conversion" value={mockAnalytics.conversionRate} description="Views to Reg." />
-                  <StatCard title="Gender Ratio" value={mockAnalytics.genderRatio} className="text-base" />
+                  <StatCard title="Total Reg." value={event?.totalParticipants || 0} />
+                  <StatCard title="Event Type" value={event?.type || 'N/A'} description="Participation" />
+                  <StatCard title="Status" value={event?.status || 'N/A'} description="Current state" />
+                  <StatCard title="Date" value={event?.dateCompleted || 'N/A'} className="text-base" />
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Attendance Metrics</h3>
-                  <ProgressBar label="Attendance Rate" percentage={mockAnalytics.attendanceRate} colorClass="bg-green-500" />
-                  <ProgressBar label="Drop-off Rate" percentage={mockAnalytics.dropOffRate} colorClass="bg-amber-500" />
-                  <ProgressBar label="No-Show Rate" percentage={mockAnalytics.noShowRate} colorClass="bg-red-500" />
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Participation Overview</h3>
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Total engaged users</p>
+                    <p className="text-xl font-bold text-gray-900">{event?.totalParticipants || 0}</p>
+                  </div>
                 </div>
                 
                 <div className="mt-5 pt-4 border-t border-gray-100 text-center">
@@ -480,24 +485,10 @@ export default function CoordinatorResultsModule() {
               </div>
               
               <div className="p-5">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Coordinators ({mockCoordinators.length})</h3>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {mockCoordinators.map(c => (
-                    <div key={c.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-xs">
-                      <span className="font-bold text-gray-800">{c.name}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold ${c.role === "Primary Owner" ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-600"}`}>
-                        {c.role}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Recent Activity</h3>
-                <div className="h-[240px] overflow-y-auto pr-2 custom-scrollbar">
-                  {mockLogs.map(log => (
-                    <ActivityLogRow key={log.id} log={log} />
-                  ))}
-                </div>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Note</h3>
+                <p className="text-xs text-gray-500 italic">
+                  Results and certificates are only available after the event has been officially ended by the coordinator.
+                </p>
               </div>
             </div>
 

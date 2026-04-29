@@ -2,83 +2,81 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import * as adminService from "../services/adminService";
 
+/* ─── Sub-components ─── */
+
 const StatCard = ({ icon, label, value, sub, color }) => (
-  <div style={{
-    background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", padding: "22px 20px",
-    display: "flex", alignItems: "flex-start", gap: 14, transition: "box-shadow 0.2s, transform 0.2s",
-    cursor: "default", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-  }}
-    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.transform = "none"; }}
-  >
-    <div style={{
-      width: 44, height: 44, borderRadius: 12, background: `${color}15`,
-      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0,
-    }}>{icon}</div>
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: "#111827", lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontWeight: 500 }}>{sub}</div>}
+  <div className="group bg-white rounded-2xl border border-gray-200/80 p-5 flex items-start gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+    <div
+      className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
+      style={{ background: `${color}12` }}
+    >
+      {icon}
+    </div>
+    <div className="min-w-0">
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[28px] font-extrabold text-gray-900 leading-none">{value}</p>
+      {sub && <p className="text-xs text-gray-500 font-medium mt-1">{sub}</p>}
     </div>
   </div>
 );
 
-const EventRow = ({ event }) => (
-  <div style={{
-    display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px",
-    borderBottom: "1px solid #f3f4f6", transition: "background 0.1s",
-  }}
-    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, background: "#eef2ff",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
-      }}>📅</div>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{event.title}</div>
-        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
-          {event.eventDate ? new Date(event.eventDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "No date set"}
+const EventRow = ({ event }) => {
+  const statusStyles = {
+    OPEN:      "bg-indigo-50 text-indigo-600",
+    CLOSED:    "bg-amber-50 text-amber-600",
+    LIVE:      "bg-emerald-50 text-emerald-600",
+    COMPLETED: "bg-gray-100 text-gray-500",
+    upcoming:  "bg-indigo-50 text-indigo-600",
+    ongoing:   "bg-emerald-50 text-emerald-600",
+    open:      "bg-indigo-50 text-indigo-600",
+    live:      "bg-emerald-50 text-emerald-600",
+    completed: "bg-gray-100 text-gray-500",
+    closed:    "bg-amber-50 text-amber-600",
+  };
+
+  return (
+    <div className="group flex items-center justify-between px-5 py-3.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/80 transition-colors duration-150">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-base shrink-0 group-hover:bg-indigo-100 transition-colors">
+          📅
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-gray-900 truncate">{event.title}</p>
+          <p className="text-xs text-gray-400 font-medium mt-0.5">
+            {event.eventDate ? new Date(event.eventDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "No date set"}
+          </p>
         </div>
       </div>
+      <div className="flex items-center gap-3 shrink-0 ml-3">
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize ${statusStyles[event.status] || "bg-gray-100 text-gray-500"}`}>
+          {event.status}
+        </span>
+        <span className="text-xs text-gray-400 font-semibold min-w-[36px] text-right">
+          {event.participants?.length || 0} 👤
+        </span>
+      </div>
     </div>
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{
-        fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6,
-        background: event.status === "upcoming" ? "#eef2ff" : event.status === "ongoing" ? "#ecfdf5" : "#f3f4f6",
-        color: event.status === "upcoming" ? "#4f46e5" : event.status === "ongoing" ? "#059669" : "#6b7280",
-        textTransform: "capitalize",
-      }}>{event.status}</span>
-      <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, minWidth: 30, textAlign: "right" }}>
-        {event.participants?.length || 0} 👤
-      </span>
+  );
+};
+
+const CoordRow = ({ coord }) => (
+  <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
+    <div className="flex items-center gap-3 min-w-0">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+        {coord.name?.charAt(0)?.toUpperCase() || "?"}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-gray-900 truncate">{coord.name}</p>
+        <p className="text-[11px] text-gray-400 font-medium truncate">{coord.email}</p>
+      </div>
     </div>
+    <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full shrink-0 ml-3">
+      {coord.eventCount} events
+    </span>
   </div>
 );
 
-const CoordRow = ({ coord }) => (
-  <div style={{
-    display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px",
-    borderBottom: "1px solid #f3f4f6",
-  }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{
-        width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-        display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0,
-      }}>
-        {coord.name?.charAt(0)?.toUpperCase() || "?"}
-      </div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{coord.name}</div>
-        <div style={{ fontSize: 11, color: "#9ca3af" }}>{coord.email}</div>
-      </div>
-    </div>
-    <span style={{
-      fontSize: 11, fontWeight: 700, background: "#ecfdf5", color: "#059669", padding: "3px 8px", borderRadius: 6,
-    }}>{coord.eventCount} events</span>
-  </div>
-);
+/* ─── Main Component ─── */
 
 export default function AdminHome({ onNavigate }) {
   const { user } = useAuth();
@@ -109,17 +107,16 @@ export default function AdminHome({ onNavigate }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 36, height: 36, border: "3px solid #e5e7eb", borderTop: "3px solid #6366f1", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-          <p style={{ color: "#9ca3af", fontSize: 13 }}>Loading dashboard…</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-9 h-9 border-[3px] border-gray-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-400 text-sm font-medium">Loading dashboard…</p>
         </div>
       </div>
     );
   }
 
-  const upcoming = events.filter(e => e.status === "upcoming");
+  const upcoming = events.filter(e => e.status === "upcoming" || e.status === "open");
   const coordMap = new Map();
   events.forEach(e => {
     (e.coordinators || []).forEach(c => {
@@ -132,77 +129,97 @@ export default function AdminHome({ onNavigate }) {
   const activeCoords = Array.from(coordMap.values()).slice(0, 8);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Welcome */}
-      <div style={{
-        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)", borderRadius: 16, padding: "28px 32px",
-        color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16,
-      }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Welcome back, {user?.name?.split(" ")[0] || "Admin"} 👋</h1>
-          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>Here's an overview of your event management platform.</p>
+    <div className="flex flex-col gap-6">
+
+      {/* ── Welcome Banner ── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl px-6 sm:px-8 py-7 text-white shadow-lg">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/[0.06] rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-violet-500/[0.04] rounded-full translate-y-1/2 -translate-x-1/4 blur-xl pointer-events-none" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+              Welcome back, {user?.name?.split(" ")[0] || "Admin"} 👋
+            </h1>
+            <p className="text-sm text-white/50 mt-1.5 font-medium">
+              Here's an overview of your event management platform.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate("events")}
+            className="shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white border-none rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-200 hover:shadow-lg"
+          >
+            + Create Event
+          </button>
         </div>
-        <button
-          onClick={() => onNavigate("events")}
-          style={{
-            background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, padding: "12px 24px",
-            fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "background 0.15s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "#4f46e5"}
-          onMouseLeave={e => e.currentTarget.style.background = "#6366f1"}
-        >
-          + Create Event
-        </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+      {/* ── Stats Grid ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon="📅" label="Total Events" value={stats?.totalEvents || 0} sub="All time" color="#6366f1" />
-        <StatCard icon="🚀" label="Upcoming Events" value={stats?.upcomingEvents || 0} sub="Scheduled" color="#f59e0b" />
-        <StatCard icon="👥" label="Total Participation" value={stats?.totalParticipation || 0} sub="Registered users" color="#10b981" />
-        <StatCard icon="📈" label="Avg Participation" value={stats?.avgParticipation || 0} sub="Per event" color="#8b5cf6" />
+        <StatCard icon="🚀" label="Upcoming" value={stats?.upcomingEvents || 0} sub="Scheduled" color="#f59e0b" />
+        <StatCard icon="👥" label="Participants" value={stats?.totalParticipation || 0} sub="Registered" color="#10b981" />
+        <StatCard icon="📈" label="Avg / Event" value={stats?.avgParticipation || 0} sub="Per event" color="#8b5cf6" />
       </div>
 
-      {/* Two columns */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* Upcoming */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          <div style={{
-            padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111827", margin: 0 }}>Upcoming Events</h3>
-            <button
-              onClick={() => onNavigate("events")}
-              style={{ background: "none", border: "none", fontSize: 12, fontWeight: 600, color: "#6366f1", cursor: "pointer" }}
-            >See all →</button>
+      {/* ── Content Cards ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+
+        {/* Upcoming Events */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-gray-900">Upcoming Events</h3>
+            <button onClick={() => onNavigate("events")} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+              See all →
+            </button>
           </div>
-          <div>
-            {upcoming.length === 0 ? (
-              <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>No upcoming events.</div>
-            ) : (
-              upcoming.slice(0, 6).map(e => <EventRow key={e._id} event={e} />)
-            )}
-          </div>
+          {upcoming.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xl mx-auto mb-2">📭</div>
+              <p className="text-sm text-gray-400 font-medium">No upcoming events.</p>
+            </div>
+          ) : (
+            upcoming.slice(0, 5).map(e => <EventRow key={e._id} event={e} />)
+          )}
         </div>
 
-        {/* Active Coordinators */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          <div style={{
-            padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111827", margin: 0 }}>Active Coordinators</h3>
-            <button
-              onClick={() => onNavigate("coordinators")}
-              style={{ background: "none", border: "none", fontSize: 12, fontWeight: 600, color: "#6366f1", cursor: "pointer" }}
-            >View all →</button>
+        {/* Coordinators */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-gray-900">Active Coordinators</h3>
+            <button onClick={() => onNavigate("coordinators")} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+              View all →
+            </button>
           </div>
-          <div>
-            {activeCoords.length === 0 ? (
-              <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>No active coordinators.</div>
-            ) : (
-              activeCoords.map(c => <CoordRow key={c._id} coord={c} />)
-            )}
-          </div>
+          {activeCoords.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xl mx-auto mb-2">👥</div>
+              <p className="text-sm text-gray-400 font-medium">No active coordinators.</p>
+            </div>
+          ) : (
+            activeCoords.map(c => <CoordRow key={c._id} coord={c} />)
+          )}
+        </div>
+      </div>
+
+      {/* ── Analytics CTA ── */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-extrabold text-gray-900">Analytics Overview</h3>
+          <button onClick={() => onNavigate("analytics")} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+            View Detailed →
+          </button>
+        </div>
+        <div className="py-12 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-3xl mx-auto mb-3">📊</div>
+          <p className="text-sm font-bold text-gray-700">Platform Analytics</p>
+          <p className="text-xs text-gray-400 mt-1">Navigate to the full Analytics page for charts and insights.</p>
+          <button
+            onClick={() => onNavigate("analytics")}
+            className="mt-4 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors"
+          >
+            View Charts →
+          </button>
         </div>
       </div>
     </div>

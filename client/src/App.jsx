@@ -1,25 +1,21 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./landing/LandingPage";
 import RegisterPage from "./auth/RegisterPage";
 import LoginPage from "./auth/LoginPage";
 import ForgotPasswordPage from "./auth/ForgotPasswordPage";
-import CoordinatorDashboard from "./coordinator/CoordinatorDashboard";
-import CoordinatorAssignedEvents from "./coordinator/CoordinatorAssignedEvents";
-import CoordinatorEventManagement from "./coordinator/CoordinatorEventManagement";
-import CoordinatorEventOperations from "./coordinator/CoordinatorEventOperations";
-import CoordinatorResultsModule from "./coordinator/CoordinatorResultsModule";
+import CoordinatorPanel from "./coordinator/CoordinatorPanel";
 import AdminPanel from "./admin/AdminPanel";
-import ParticipantDashboard from "./participant/ParticipantDashboard";
-import EventsBrowsePage from "./participant/EventsBrowsePage";
-import CertificatesPage from "./participant/CertificatesPage";
+import ParticipantPanel from "./participant/ParticipantPanel";
 import "./App.css";
 
 function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
@@ -53,48 +49,34 @@ function App() {
           {/* Coordinator Protected Routes */}
           <Route path="/coordinator-dashboard" element={
             <ProtectedRoute roles={['coordinator']}>
-              <CoordinatorDashboard />
+              <CoordinatorPanel />
             </ProtectedRoute>
           } />
           <Route path="/coordinator-events" element={
             <ProtectedRoute roles={['coordinator']}>
-              <CoordinatorAssignedEvents />
-            </ProtectedRoute>
-          } />
-          <Route path="/coordinator-management" element={
-            <ProtectedRoute roles={['coordinator']}>
-              <CoordinatorEventManagement />
-            </ProtectedRoute>
-          } />
-          <Route path="/coordinator-operations/:eventId" element={
-            <ProtectedRoute roles={['coordinator']}>
-              <CoordinatorEventOperations />
-            </ProtectedRoute>
-          } />
-          <Route path="/coordinator-results/:eventId" element={
-            <ProtectedRoute roles={['coordinator']}>
-              <CoordinatorResultsModule />
+              <CoordinatorPanel />
             </ProtectedRoute>
           } />
 
-          {/* Participant Protected Routes */}
+          {/* Participant — single panel */}
           <Route path="/participant-dashboard" element={
             <ProtectedRoute roles={['participant']}>
-              <ParticipantDashboard />
+              <ParticipantPanel />
             </ProtectedRoute>
           } />
           <Route path="/events" element={
             <ProtectedRoute roles={['participant']}>
-              <EventsBrowsePage />
+              <ParticipantPanel />
             </ProtectedRoute>
           } />
           <Route path="/certificates" element={
             <ProtectedRoute roles={['participant']}>
-              <CertificatesPage />
+              <ParticipantPanel />
             </ProtectedRoute>
           } />
         </Routes>
       </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

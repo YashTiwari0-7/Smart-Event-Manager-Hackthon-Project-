@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import * as participantService from "../services/participantService";
+import { useToast } from "../context/ToastContext";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 /* ─────────────── Mock Data ─────────────────────── */
 const mockUser = {
@@ -184,9 +186,11 @@ const AchievementBadge = ({ badge }) => (
 
 /* ─────────────── Event Detail Modal ─────────────── */
 const EventDetailModal = ({ event, onClose }) => {
+  const { showToast } = useToast();
+  const [confirmConfig, setConfirmConfig] = useState({ show: false, action: null, title: "", message: "", type: "primary" });
   if (!event) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" onClick={onClose}>
+    <>
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
       <div
         className="relative bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-md p-6 space-y-4"
@@ -223,16 +227,23 @@ const EventDetailModal = ({ event, onClose }) => {
             </button>
           ) : event.isRegistered ? (
             <button 
-              onClick={async () => {
-                if (!window.confirm("Are you sure you want to withdraw from this event?")) return;
-                try {
-                  await participantService.withdrawFromEvent(event.id);
-                  alert('Withdrawn successfully! Please refresh to update your dashboard.');
-                  onClose();
-                  window.location.reload();
-                } catch (err) {
-                  alert(err.response?.data?.message || 'Withdrawal failed');
-                }
+              onClick={() => {
+                setConfirmConfig({
+                  show: true,
+                  title: "Withdraw from Event?",
+                  message: "Are you sure you want to withdraw? This action cannot be undone.",
+                  type: "danger",
+                  action: async () => {
+                    try {
+                      await participantService.withdrawFromEvent(event.id);
+                      showToast('Withdrawn successfully! Please refresh to update your dashboard.');
+                      onClose();
+                      window.location.reload();
+                    } catch (err) {
+                      showToast(err.response?.data?.message || 'Withdrawal failed', "error");
+                    }
+                  }
+                });
               }}
               className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
             >
@@ -243,11 +254,11 @@ const EventDetailModal = ({ event, onClose }) => {
               onClick={async () => {
                 try {
                   await participantService.registerForEvent(event.id);
-                  alert('Registered successfully! Please refresh to update your dashboard.');
+                  showToast('Registered successfully! Please refresh to update your dashboard.');
                   onClose();
                   window.location.reload();
                 } catch (err) {
-                  alert(err.response?.data?.message || 'Registration failed');
+                  showToast(err.response?.data?.message || 'Registration failed', "error");
                 }
               }}
               className="flex-1 py-2.5 text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-xl transition-all"
@@ -258,7 +269,18 @@ const EventDetailModal = ({ event, onClose }) => {
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">Close</button>
         </div>
       </div>
-    </div>
+      <ConfirmationModal
+        isOpen={confirmConfig.show}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={() => {
+          confirmConfig.action();
+          setConfirmConfig({ ...confirmConfig, show: false });
+        }}
+        onCancel={() => setConfirmConfig({ ...confirmConfig, show: false })}
+      />
+    </>
   );
 };
 
@@ -283,7 +305,7 @@ const ParticipantDashboard = () => {
         ]);
         setEvents((eventsData || []).map(e => ({
           id: e._id, name: e.title, type: e.participationType === 'team' ? 'Team' : 'Individual',
-          status: e.status === 'ongoing' ? 'Ongoing' : 'Upcoming',
+          status: e.status === 'LIVE' ? 'Live' : 'Upcoming',
           date: e.eventDate ? new Date(e.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
           venue: 'Campus', category: 'Event',
           seats: (e.totalSlots || 0) - (e.participants?.length || 0)
@@ -308,7 +330,7 @@ const ParticipantDashboard = () => {
   const mockStats = [
     { icon: "📅", label: "Events Available", value: String(events.length), trend: "Browse" },
     { icon: "🔴", label: "History", value: String(history.length), trend: "Past events" },
-    { icon: "✅", label: "Registered", value: String(events.filter(e => e.status === 'Ongoing').length), trend: "Active" },
+    { icon: "✅", label: "Registered", value: String(events.filter(e => e.status === 'Live' || e.status === 'LIVE').length), trend: "Active" },
     { icon: "🏆", label: "Achievements", value: "0", trend: "Earn more" },
   ];
   const mockNotifications = [];
@@ -328,7 +350,7 @@ const ParticipantDashboard = () => {
     id: h.event?._id,
     name: h.event?.title,
     type: h.event?.participationType === 'team' ? 'Team' : 'Individual',
-    status: h.event?.status === 'ongoing' ? 'Ongoing' : h.event?.status === 'completed' ? 'Completed' : 'Upcoming',
+    status: h.event?.status === 'LIVE' ? 'Live' : h.event?.status === 'COMPLETED' ? 'Completed' : 'Upcoming',
     date: h.event?.eventDate ? new Date(h.event?.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
     venue: 'Campus', category: 'Registered',
     seats: 0,

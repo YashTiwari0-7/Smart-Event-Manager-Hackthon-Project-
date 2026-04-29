@@ -20,6 +20,10 @@ const certificateSchema = new mongoose.Schema(
         url: {
             type: String,
             required: true
+        },
+        rank: {
+            type: String,
+            default: null
         }
     },
     { timestamps: true }

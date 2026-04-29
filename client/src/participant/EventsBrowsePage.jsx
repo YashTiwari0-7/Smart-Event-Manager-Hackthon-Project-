@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as participantService from "../services/participantService";
+import { useToast } from "../context/ToastContext";
 
 
 
@@ -8,6 +9,7 @@ const categories = ["All", "Technology", "Business", "Design", "Education"];
 
 const EventCard = ({ event }) => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   return (
     <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
@@ -33,9 +35,9 @@ const EventCard = ({ event }) => {
       <button onClick={async () => {
         try {
           await participantService.registerForEvent(event.id);
-          alert('Registered successfully!');
+          showToast('Registered successfully!');
         } catch (err) {
-          alert(err.response?.data?.message || 'Registration failed');
+          showToast(err.response?.data?.message || 'Registration failed', "error");
         }
       }} className="mt-auto w-full py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl transition-all">
         Register Now
@@ -58,7 +60,7 @@ const EventsBrowsePage = () => {
         const data = await participantService.getAvailableEvents();
         setAllEvents((data || []).map(e => ({
           id: e._id, name: e.title, type: e.participationType === 'team' ? 'Team' : 'Individual',
-          status: e.status === 'ongoing' ? 'Ongoing' : 'Upcoming',
+          status: e.status === 'LIVE' ? 'Live' : e.status === 'CLOSED' ? 'Closed' : e.status === 'COMPLETED' ? 'Completed' : 'Open',
           date: e.eventDate ? new Date(e.eventDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'TBD',
           venue: 'Campus', category: 'Event',
           seats: (e.totalSlots || 0) - (e.participants?.length || 0),
